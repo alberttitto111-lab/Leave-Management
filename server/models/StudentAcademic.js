@@ -9,46 +9,88 @@ const studentAcademicSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+
     academicInfo: {
-      rollNumber: { type: String, required: true, unique: true, index: true },
-      class: { type: String, required: true, index: true },
-      section: { type: String, required: true },
-      batchYear: { type: Number, required: true, index: true },
-      parentDetails: {
-        fatherName: String,
-        motherName: String,
-        parentPhone: String,
-        parentEmail: String,
+      rollNumber: {
+        type: String,
+        required: true,
+        unique: true,
+        index: true,
+        trim: true,
       },
-      guardianName: String,
-      guardianPhone: String,
+
+      class: {
+        type: String,
+        required: true,
+        index: true,
+        trim: true,
+      },
+
+      section: {
+        type: String,
+        required: true,
+        trim: true,
+      },
+
+      batchYear: {
+        type: Number,
+        required: true,
+        index: true,
+      },
+
+      parentDetails: {
+        fatherName: { type: String, trim: true },
+        motherName: { type: String, trim: true },
+        parentPhone: { type: String, trim: true },
+        parentEmail: { type: String, trim: true, lowercase: true },
+      },
+
+      guardianName: { type: String, trim: true },
+      guardianPhone: { type: String, trim: true },
     },
+
     classTeacherId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
     },
+
     hodId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
     },
+
     attendanceStats: {
       totalDays: { type: Number, default: 0 },
       presentDays: { type: Number, default: 0 },
       absentDays: { type: Number, default: 0 },
-      leavePercentage: { type: Number, default: 0, min: 0, max: 100 },
+      leavePercentage: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 100,
+      },
     },
   },
   { timestamps: true },
 );
 
-studentAcademicSchema.pre("save", function (next) {
-  if (this.attendanceStats.totalDays > 0) {
-    this.attendanceStats.leavePercentage =
-      (this.attendanceStats.absentDays / this.attendanceStats.totalDays) * 100;
+/**
+ * ✅ Mongoose 7+ compatible middleware
+ * ❌ NO next()
+ * ❌ NO callback arguments
+ */
+studentAcademicSchema.pre("save", function () {
+  const stats = this.attendanceStats;
+
+  if (!stats) return;
+
+  if (stats.totalDays > 0) {
+    stats.leavePercentage = (stats.absentDays / stats.totalDays) * 100;
+  } else {
+    stats.leavePercentage = 0;
   }
-  next();
 });
 
 export default mongoose.model("StudentAcademic", studentAcademicSchema);

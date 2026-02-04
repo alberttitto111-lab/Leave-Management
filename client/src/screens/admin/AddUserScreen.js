@@ -194,7 +194,7 @@ const AddUserScreen = ({ navigation }) => {
         };
       }
 
-      const response = await api.post("/api/admin/users", payload);
+      const response = await api.post("/admin/users", payload);
 
       Alert.alert(
         "Success",

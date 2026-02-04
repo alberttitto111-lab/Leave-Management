@@ -289,14 +289,95 @@ router.post(
 /* =========================
    DEPARTMENTS
 ========================= */
+
+// GET ALL ACTIVE DEPARTMENTS
 router.get("/departments", protect, async (req, res) => {
-  const departments = await Department.find({ isActive: true });
-  res.json(departments);
+  try {
+    const departments = await Department.find({ isActive: true }).populate(
+      "hodId",
+      "userId personalInfo.firstName personalInfo.lastName",
+    );
+
+    res.json(departments);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch departments" });
+  }
 });
 
+// ADD DEPARTMENT (ADMIN ONLY)
 router.post("/departments", protect, authorize("admin"), async (req, res) => {
-  const department = await Department.create(req.body);
-  res.status(201).json(department);
+  try {
+    const { name, code, hodId, description, isActive } = req.body;
+
+    // 1️⃣ Basic validation
+    if (!name || !code) {
+      return res.status(400).json({
+        message: "Department name and code are required",
+      });
+    }
+
+    // 2️⃣ Check duplicates
+    const existing = await Department.findOne({
+      $or: [{ name }, { code }],
+    });
+
+    if (existing) {
+      return res.status(400).json({
+        message: "Department with same name or code already exists",
+      });
+    }
+
+    // 3️⃣ Validate HOD (if provided)
+    let hodUser = null;
+    if (hodId) {
+      hodUser = await User.findById(hodId);
+      if (!hodUser || hodUser.role !== "hod") {
+        return res.status(400).json({
+          message: "Invalid HOD ID",
+        });
+      }
+    }
+
+    // 4️⃣ Create department
+    const department = await Department.create({
+      name: name.trim(),
+      code: code.trim().toUpperCase(),
+      hodId: hodUser ? hodUser._id : null,
+      description,
+      isActive: isActive !== undefined ? isActive : true,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Department created successfully",
+      department,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      message: "Failed to create department",
+      error: err.message,
+    });
+  }
 });
+
+router.put(
+  "/departments/:id",
+  protect,
+  authorize("admin"),
+  async (req, res) => {
+    const department = await Department.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true },
+    );
+
+    if (!department) {
+      return res.status(404).json({ message: "Department not found" });
+    }
+
+    res.json(department);
+  },
+);
 
 export default router;

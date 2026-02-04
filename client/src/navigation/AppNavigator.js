@@ -15,6 +15,10 @@ import UserManagementScreen from "../screens/admin/UserManagementScreen";
 import AddUserScreen from "../screens/admin/AddUserScreen";
 import BulkUploadScreen from "../screens/admin/BulkUploadScreen";
 
+// ✅ Department Screens
+import DepartmentsScreen from "../screens/admin/DepartmentScreen";
+import AddEditDepartmentScreen from "../screens/admin/AddEditDepartmentScreen";
+
 // HOD Screens
 import HODDashboard from "../screens/dashboard/HODDashboard";
 
@@ -54,6 +58,8 @@ const AdminTabs = () => (
     <Tab.Screen name="Settings" component={AdminDashboard} />
   </Tab.Navigator>
 );
+
+/* -------------------- OTHER TABS (UNCHANGED) -------------------- */
 
 const HODTabs = () => (
   <Tab.Navigator
@@ -132,12 +138,11 @@ const StudentTabs = () => (
 const AppNavigator = () => {
   const { user, loading, isAuthenticated } = useAuth();
 
-  if (loading) return null; // Optional: add a loading screen
+  if (loading) return null;
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {!isAuthenticated ? (
-        // Auth Stack
         <>
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen
@@ -146,14 +151,14 @@ const AppNavigator = () => {
           />
         </>
       ) : user?.mustChangePassword ? (
-        // Force password change
         <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
       ) : (
-        // Role-based main stack
         <>
           {user?.role === USER_ROLES.ADMIN && (
             <>
               <Stack.Screen name="AdminMain" component={AdminTabs} />
+
+              {/* EXISTING */}
               <Stack.Screen
                 name="AddUser"
                 component={AddUserScreen}
@@ -174,8 +179,31 @@ const AppNavigator = () => {
                   headerTintColor: "#fff",
                 }}
               />
+
+              {/* ✅ NEW: DEPARTMENTS */}
+              <Stack.Screen
+                name="Departments"
+                component={DepartmentsScreen}
+                options={{
+                  headerShown: true,
+                  title: "Departments",
+                  headerStyle: { backgroundColor: "#7C3AED" },
+                  headerTintColor: "#fff",
+                }}
+              />
+              <Stack.Screen
+                name="AddEditDepartment"
+                component={AddEditDepartmentScreen}
+                options={{
+                  headerShown: true,
+                  title: "Department",
+                  headerStyle: { backgroundColor: "#7C3AED" },
+                  headerTintColor: "#fff",
+                }}
+              />
             </>
           )}
+
           {user?.role === USER_ROLES.HOD && (
             <Stack.Screen name="HODMain" component={HODTabs} />
           )}

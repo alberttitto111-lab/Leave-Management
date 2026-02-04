@@ -76,7 +76,7 @@ const AdminDashboard = ({ navigation }) => {
     {
       title: "Departments",
       icon: "office-building",
-      screen: null,
+      screen: "Departments",
       color: COLORS.info,
     },
     {
