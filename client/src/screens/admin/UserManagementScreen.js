@@ -184,7 +184,9 @@ const UserManagementScreen = ({ navigation }) => {
         renderItem={({ item }) => (
           <UserItem
             user={item}
-            onPress={(user) => console.log("User pressed:", user.userId)}
+            onPress={(user) =>
+              navigation.navigate("EditUser", { userId: user._id })
+            }
           />
         )}
         keyExtractor={(item) => item._id}

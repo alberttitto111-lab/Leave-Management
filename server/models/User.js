@@ -14,7 +14,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       minlength: 6,
-      select: false, // 🔒 prevents password from being returned by default
+      select: false,
     },
 
     role: {
@@ -31,6 +31,27 @@ const userSchema = new mongoose.Schema(
       dateOfBirth: Date,
       gender: String,
       address: String,
+    },
+
+    /* ✅ NEW — Teacher Only */
+    teachingInfo: {
+      classSections: [{ type: String, trim: true }],
+      subjects: [{ type: String, trim: true }],
+      isClassTeacher: {
+        type: Boolean,
+        default: false,
+      },
+    },
+
+    /* ✅ NEW — HOD Only */
+    hodInfo: {
+      officeRoom: { type: String, trim: true },
+      managedDepartments: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Department",
+        },
+      ],
     },
 
     departmentId: {
@@ -53,14 +74,13 @@ const userSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true, // ✅ automatically handles createdAt & updatedAt
+    timestamps: true,
   },
 );
 
 /* 🔐 Hash password before saving */
 userSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
-
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
 });

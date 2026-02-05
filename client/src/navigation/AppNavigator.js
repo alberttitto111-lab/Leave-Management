@@ -28,6 +28,8 @@ import TeacherDashboard from "../screens/dashboard/TeacherDashboard";
 // Student Screens
 import StudentDashboard from "../screens/dashboard/StudentDashboard";
 
+import EditUserScreen from "../screens/admin/EditUserScreen";
+
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -175,6 +177,16 @@ const AppNavigator = () => {
                 options={{
                   headerShown: true,
                   title: "Bulk Upload Users",
+                  headerStyle: { backgroundColor: "#7C3AED" },
+                  headerTintColor: "#fff",
+                }}
+              />
+              <Stack.Screen
+                name="EditUser"
+                component={EditUserScreen}
+                options={{
+                  headerShown: true,
+                  title: "Edit User",
                   headerStyle: { backgroundColor: "#7C3AED" },
                   headerTintColor: "#fff",
                 }}

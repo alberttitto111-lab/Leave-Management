@@ -116,6 +116,19 @@ const AddUserScreen = ({ navigation }) => {
   const [parentPhone, setParentPhone] = useState("");
   const [parentEmail, setParentEmail] = useState("");
 
+  // ---------------- TEACHER / HOD INFO ----------------
+
+  // Teacher
+  const [teacherClasses, setTeacherClasses] = useState("");
+  const [teacherSections, setTeacherSections] = useState("");
+  const [subjects, setSubjects] = useState("");
+  const [isClassTeacher, setIsClassTeacher] = useState(false);
+
+  // HOD
+  const [hodOffice, setHodOffice] = useState("");
+
+  const [submitted, setSubmitted] = useState(false);
+
   useEffect(() => {
     fetchDepartments();
   }, []);
@@ -344,6 +357,75 @@ const AddUserScreen = ({ navigation }) => {
   );
 
   const renderStep3 = () => {
+    // ---------------- TEACHER ----------------
+    if (role === "teacher") {
+      return (
+        <View style={styles.stepContainer}>
+          <Text style={styles.stepTitle}>Teaching Information</Text>
+
+          <InputField
+            label="Classes"
+            value={teacherClasses}
+            onChangeText={setTeacherClasses}
+            placeholder="e.g., 10,11,12"
+            icon="school-outline"
+          />
+
+          <InputField
+            label="Sections"
+            value={teacherSections}
+            onChangeText={setTeacherSections}
+            placeholder="e.g., A,B,C"
+            icon="git-branch-outline"
+          />
+
+          <InputField
+            label="Subjects"
+            value={subjects}
+            onChangeText={setSubjects}
+            placeholder="e.g., Maths, Physics"
+            icon="book-outline"
+          />
+
+          <SelectField
+            label="Class Teacher?"
+            value={isClassTeacher ? "yes" : "no"}
+            onSelect={(v) => setIsClassTeacher(v === "yes")}
+            options={[
+              { label: "Yes", value: "yes" },
+              { label: "No", value: "no" },
+            ]}
+          />
+        </View>
+      );
+    }
+
+    // ---------------- HOD ----------------
+    if (role === "hod") {
+      return (
+        <View style={styles.stepContainer}>
+          <Text style={styles.stepTitle}>HOD Information</Text>
+
+          <InputField
+            label="Office / Cabin"
+            value={hodOffice}
+            onChangeText={setHodOffice}
+            placeholder="e.g., Block B Room 204"
+            icon="business-outline"
+          />
+
+          <InputField
+            label="Subjects Handled"
+            value={subjects}
+            onChangeText={setSubjects}
+            placeholder="e.g., Robotics, AI"
+            icon="book-outline"
+          />
+        </View>
+      );
+    }
+
+    // ---------------- NON-STUDENT REVIEW (unchanged behavior) ----------------
     if (role !== "student") {
       return (
         <View style={styles.stepContainer}>
@@ -359,6 +441,7 @@ const AddUserScreen = ({ navigation }) => {
       );
     }
 
+    // ---------------- STUDENT (UNCHANGED — exactly yours) ----------------
     return (
       <View style={styles.stepContainer}>
         <Text style={styles.stepTitle}>Academic Information (Student)</Text>
@@ -495,8 +578,7 @@ const AddUserScreen = ({ navigation }) => {
             <Text style={styles.backButtonText}>Back</Text>
           </TouchableOpacity>
         )}
-
-        {currentStep < 3 ? (
+        {/* {currentStep < 3 ? (
           <TouchableOpacity
             style={[styles.nextButton, currentStep === 1 && styles.fullWidth]}
             onPress={() => {
@@ -519,6 +601,49 @@ const AddUserScreen = ({ navigation }) => {
               <>
                 <Text style={styles.nextButtonText}>Create User</Text>
                 <Ionicons name="checkmark" size={20} color="#fff" />
+              </>
+            )}
+          </TouchableOpacity>
+        )} */}
+
+        {currentStep < 3 ? (
+          <TouchableOpacity
+            style={[styles.nextButton, currentStep === 1 && styles.fullWidth]}
+            onPress={() => {
+              if (currentStep === 1 && validateStep1()) setCurrentStep(2);
+              else if (currentStep === 2 && validateStep2()) setCurrentStep(3);
+            }}
+          >
+            <Text style={styles.nextButtonText}>Next</Text>
+            <Ionicons name="arrow-forward" size={20} color="#fff" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.nextButton, styles.submitButton]}
+            onPress={async () => {
+              if (!submitted) {
+                // First click: submit form
+                await handleSubmit();
+                setSubmitted(true); // Mark as submitted
+              } else {
+                // Second click: reload the page
+                window.location.reload();
+              }
+            }}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Text style={styles.nextButtonText}>
+                  {submitted ? "Reload Page" : "Create User"}
+                </Text>
+                <Ionicons
+                  name={submitted ? "reload-outline" : "checkmark"}
+                  size={20}
+                  color="#fff"
+                />
               </>
             )}
           </TouchableOpacity>
@@ -587,6 +712,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   inputContainer: {
+    position: "relative",
+    bottom: 0,
     marginBottom: 16,
   },
   label: {

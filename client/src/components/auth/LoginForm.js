@@ -1,116 +1,125 @@
 import React, { useState } from "react";
 import {
   View,
+  Text,
+  TextInput,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
+  TouchableOpacity,
 } from "react-native";
-import Input from "../common/Input";
-import Button from "../common/Button";
-import { COLORS, MESSAGES, REGEX } from "../../utils/constants";
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import { COLORS } from "../../utils/constants";
 
 const LoginForm = ({ onSubmit, loading }) => {
-  const [formData, setFormData] = useState({
-    userId: "",
-    password: "",
-  });
-  const [errors, setErrors] = useState({});
-  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-
-  const validateForm = () => {
-    const newErrors = {};
-
-    if (!formData.userId.trim()) {
-      newErrors.userId = MESSAGES.REQUIRED_FIELD;
-    } else if (!REGEX.USER_ID.test(formData.userId)) {
-      newErrors.userId =
-        "User ID must be 4-20 characters (letters, numbers, underscore, hyphen)";
-    }
-
-    if (!formData.password) {
-      newErrors.password = MESSAGES.REQUIRED_FIELD;
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  const [userId, setUserId] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSubmit = () => {
-    if (validateForm()) {
-      onSubmit(formData.userId, formData.password);
+    // ✅ Only basic required validation — nothing else
+    if (!userId.trim() || !password.trim()) {
+      setError("User ID and Password are required");
+      return;
     }
-  };
 
-  const updateField = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: null }));
-    }
+    setError("");
+    onSubmit(userId.trim(), password);
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+    <View>
+      {/* USER ID */}
+      <View style={styles.inputContainer}>
+        <Icon name="account-outline" size={20} color={COLORS.slate} />
+        <TextInput
+          style={styles.input}
+          placeholder="User ID"
+          value={userId}
+          onChangeText={setUserId}
+          autoCapitalize="none"
+        />
+      </View>
+
+      {/* PASSWORD */}
+      <View style={styles.inputContainer}>
+        <Icon name="lock-outline" size={20} color={COLORS.slate} />
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!showPassword}
+        />
+
+        <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+          <Icon
+            name={showPassword ? "eye-off-outline" : "eye-outline"}
+            size={20}
+            color={COLORS.slate}
+          />
+        </TouchableOpacity>
+      </View>
+
+      {/* ERROR */}
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+
+      {/* BUTTON */}
+      <TouchableOpacity
+        style={[styles.button, loading && styles.buttonDisabled]}
+        onPress={handleSubmit}
+        disabled={loading}
       >
-        <View style={styles.formContainer}>
-          <Input
-            label="User ID"
-            placeholder="Enter your user ID"
-            value={formData.userId}
-            onChangeText={(text) => updateField("userId", text)}
-            error={errors.userId}
-            icon="account-outline"
-            autoCapitalize="none"
-            editable={!loading}
-          />
-
-          <Input
-            label="Password"
-            placeholder="Enter your password"
-            value={formData.password}
-            onChangeText={(text) => updateField("password", text)}
-            error={errors.password}
-            secureTextEntry={!isPasswordVisible}
-            icon={isPasswordVisible ? "eye-off" : "eye"}
-            onIconPress={() => setIsPasswordVisible(!isPasswordVisible)}
-            editable={!loading}
-          />
-
-          <Button
-            title="Sign In"
-            onPress={handleSubmit}
-            loading={loading}
-            fullWidth
-            style={styles.submitButton}
-            icon="login"
-          />
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        <Text style={styles.buttonText}>
+          {loading ? "Signing in..." : "Sign In"}
+        </Text>
+      </TouchableOpacity>
+    </View>
   );
 };
 
+export default LoginForm;
+
 const styles = StyleSheet.create({
-  container: {
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: COLORS.grayLight,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+    backgroundColor: COLORS.white,
+  },
+
+  input: {
     flex: 1,
+    paddingVertical: 12,
+    marginLeft: 8,
+    fontSize: 14,
+    color: COLORS.slateDark,
   },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: "center",
+
+  error: {
+    color: "#d32f2f",
+    fontSize: 12,
+    marginBottom: 12,
   },
-  formContainer: {
-    width: "100%",
-  },
-  submitButton: {
+
+  button: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
     marginTop: 8,
   },
-});
 
-export default LoginForm;
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+
+  buttonText: {
+    color: COLORS.white,
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+});

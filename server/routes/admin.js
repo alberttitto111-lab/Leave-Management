@@ -24,6 +24,8 @@ router.post("/users", protect, authorize("admin"), async (req, res) => {
       personalInfo,
       departmentId,
       academicInfo,
+      teachingInfo, // ✅ added
+      hodInfo, // ✅ added
     } = req.body;
 
     if (!userId || !role) {
@@ -44,8 +46,15 @@ router.post("/users", protect, authorize("admin"), async (req, res) => {
       personalInfo,
       departmentId: role === "admin" ? null : departmentId,
       mustChangePassword: true,
+
+      // ✅ teacher support
+      teachingInfo: role === "teacher" ? teachingInfo : undefined,
+
+      // ✅ hod support
+      hodInfo: role === "hod" ? hodInfo : undefined,
     });
 
+    // ✅ student academic record (unchanged)
     if (role === "student" && academicInfo) {
       await StudentAcademic.create({
         userId: user._id,
@@ -101,19 +110,19 @@ router.post(
               }
 
               const exists = await User.findOne({ userId: row.userId });
-              if (exists) {
-                throw new Error("User already exists");
-              }
+              if (exists) throw new Error("User already exists");
 
               const hashedPassword = await bcrypt.hash(
                 row.password || "TempPass123!",
                 10,
               );
 
+              const roleLower = row.role.toLowerCase();
+
               const user = await User.create({
                 userId: row.userId,
                 password: hashedPassword,
-                role: row.role.toLowerCase(),
+                role: roleLower,
                 personalInfo: {
                   firstName: row.firstName,
                   lastName: row.lastName,
@@ -122,9 +131,27 @@ router.post(
                 },
                 departmentId: row.departmentId || null,
                 mustChangePassword: true,
+
+                // ✅ teacher bulk support
+                teachingInfo:
+                  roleLower === "teacher"
+                    ? {
+                        classSections: row.classSections?.split("|") || [],
+                        subjects: row.subjects?.split("|") || [],
+                      }
+                    : undefined,
+
+                // ✅ hod bulk support
+                hodInfo:
+                  roleLower === "hod"
+                    ? {
+                        officeRoom: row.officeRoom || "",
+                      }
+                    : undefined,
               });
 
-              if (row.role.toLowerCase() === "student") {
+              // ✅ student academic (unchanged)
+              if (roleLower === "student") {
                 await StudentAcademic.create({
                   userId: user._id,
                   academicInfo: {
@@ -213,17 +240,19 @@ router.get("/users", protect, authorize("admin"), async (req, res) => {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 });
+
+/* =========================
+   ANALYTICS
+========================= */
 router.get("/analytics", protect, authorize("admin"), async (req, res) => {
   try {
-    // Example stats
     const totalUsers = await User.countDocuments();
     const totalStudents = await User.countDocuments({ role: "student" });
     const totalTeachers = await User.countDocuments({ role: "teacher" });
     const totalHODs = await User.countDocuments({ role: "hod" });
-    const pendingLeaves = 0; // Add your leave logic here
+    const pendingLeaves = 0;
     const departments = await Department.countDocuments();
 
-    // Example recent activity (dummy)
     const recentActivity = await User.find()
       .sort({ createdAt: -1 })
       .limit(5)
@@ -248,7 +277,6 @@ router.get("/analytics", protect, authorize("admin"), async (req, res) => {
       },
     });
   } catch (err) {
-    console.error(err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 });
@@ -287,10 +315,9 @@ router.post(
 );
 
 /* =========================
-   DEPARTMENTS
+   DEPARTMENTS (UNCHANGED)
 ========================= */
 
-// GET ALL ACTIVE DEPARTMENTS
 router.get("/departments", protect, async (req, res) => {
   try {
     const departments = await Department.find({ isActive: true }).populate(
@@ -299,24 +326,21 @@ router.get("/departments", protect, async (req, res) => {
     );
 
     res.json(departments);
-  } catch (err) {
+  } catch {
     res.status(500).json({ message: "Failed to fetch departments" });
   }
 });
 
-// ADD DEPARTMENT (ADMIN ONLY)
 router.post("/departments", protect, authorize("admin"), async (req, res) => {
   try {
     const { name, code, hodId, description, isActive } = req.body;
 
-    // 1️⃣ Basic validation
     if (!name || !code) {
       return res.status(400).json({
         message: "Department name and code are required",
       });
     }
 
-    // 2️⃣ Check duplicates
     const existing = await Department.findOne({
       $or: [{ name }, { code }],
     });
@@ -327,18 +351,14 @@ router.post("/departments", protect, authorize("admin"), async (req, res) => {
       });
     }
 
-    // 3️⃣ Validate HOD (if provided)
     let hodUser = null;
     if (hodId) {
       hodUser = await User.findById(hodId);
       if (!hodUser || hodUser.role !== "hod") {
-        return res.status(400).json({
-          message: "Invalid HOD ID",
-        });
+        return res.status(400).json({ message: "Invalid HOD ID" });
       }
     }
 
-    // 4️⃣ Create department
     const department = await Department.create({
       name: name.trim(),
       code: code.trim().toUpperCase(),
@@ -353,7 +373,6 @@ router.post("/departments", protect, authorize("admin"), async (req, res) => {
       department,
     });
   } catch (err) {
-    console.error(err);
     res.status(500).json({
       message: "Failed to create department",
       error: err.message,
@@ -379,5 +398,81 @@ router.put(
     res.json(department);
   },
 );
+
+/* =========================
+   GET SINGLE USER
+========================= */
+router.get("/users/:id", protect, authorize("admin"), async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id)
+      .select("-password")
+      .populate("departmentId", "name code")
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.role === "student") {
+      const academic = await StudentAcademic.findOne({
+        userId: user._id,
+      }).lean();
+      user.academicInfo = academic?.academicInfo || null;
+    }
+
+    res.json({ user });
+  } catch (err) {
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
+/* =========================
+   UPDATE USER
+========================= */
+router.patch("/users/:id", protect, authorize("admin"), async (req, res) => {
+  try {
+    const {
+      role,
+      departmentId,
+      personalInfo,
+      academicInfo,
+      teachingInfo, // ✅ added
+      hodInfo, // ✅ added
+    } = req.body;
+
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      {
+        role,
+        departmentId: role !== "admin" ? departmentId : null,
+        personalInfo,
+
+        ...(role === "teacher" && { teachingInfo }),
+        ...(role === "hod" && { hodInfo }),
+      },
+      { new: true, runValidators: true },
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (role === "student" && academicInfo) {
+      await StudentAcademic.findOneAndUpdate(
+        { userId: user._id },
+        {
+          academicInfo,
+          classTeacherId: academicInfo.classTeacherId,
+          hodId: academicInfo.hodId,
+        },
+        { new: true, upsert: true, runValidators: true },
+      );
+    }
+
+    res.json({ message: "User updated successfully", user });
+  } catch (err) {
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
 
 export default router;
