@@ -13,7 +13,7 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       required: true,
-      minlength: 6,
+      minlength: 2,
       select: false,
     },
 
@@ -31,9 +31,13 @@ const userSchema = new mongoose.Schema(
       dateOfBirth: Date,
       gender: String,
       address: String,
+      profilePicture: {
+        type: String,
+        default: null, // Stores the file path or URL
+      },
     },
 
-    /* ✅ NEW — Teacher Only */
+    /* ✅ Teacher Only */
     teachingInfo: {
       classSections: [{ type: String, trim: true }],
       subjects: [{ type: String, trim: true }],
@@ -43,7 +47,32 @@ const userSchema = new mongoose.Schema(
       },
     },
 
-    /* ✅ NEW — HOD Only */
+    /* ✅ Professional Details */
+    professionalDetails: {
+      bio: {
+        type: String,
+        maxlength: 1000,
+        trim: true,
+        default: "",
+      },
+      qualification: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+      experience: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+      specialization: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+    },
+
+    /* ✅ HOD Only */
     hodInfo: {
       officeRoom: { type: String, trim: true },
       managedDepartments: [
@@ -52,6 +81,11 @@ const userSchema = new mongoose.Schema(
           ref: "Department",
         },
       ],
+      // Add this for approval workflow
+      approvalLevel: {
+        type: Number,
+        default: 2, // HOD is typically level 2
+      },
     },
 
     departmentId: {
@@ -64,9 +98,13 @@ const userSchema = new mongoose.Schema(
       default: true,
     },
 
-    mustChangePassword: {
+    isFirstLogin: {
       type: Boolean,
       default: true,
+    },
+
+    passwordChangedAt: {
+      type: Date,
     },
 
     lastLogin: {

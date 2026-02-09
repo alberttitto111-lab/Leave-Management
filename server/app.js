@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import helmet from "helmet";
+// import helmet from "helmet"; // --- REMOVE HELMET ---
 import rateLimit from "express-rate-limit";
 import compression from "compression";
 import cookieParser from "cookie-parser";
@@ -13,64 +13,76 @@ import errorHandler from "./middleware/errorHandler.js";
 import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
 import logger from "./utils/logger.js";
+import teacherRoutes from "./routes/teacher.js";
+import hodDashboardRoutes from "./routes/hod.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load env FIRST
 dotenv.config({ path: path.join(__dirname, ".env") });
-
-// Connect DB
 connectDB();
 
 const app = express();
 
 /* ---------------- SECURITY & CORE MIDDLEWARE ---------------- */
 
-// Helmet
-app.use(helmet());
+// --- REMOVE HELMET COMPLETELY ---
+// app.use(helmet());
+// ---------------------------------
 
-// Body parsers (ONCE)
-app.use(express.json({ limit: "10kb" }));
-app.use(express.urlencoded({ extended: true, limit: "10kb" }));
+app.use(express.json({ limit: "50mb" })); // Increased limit
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use(cookieParser());
-
-// Compression
 app.use(compression());
 
-// Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 1000, // Increased limit
   standardHeaders: true,
   legacyHeaders: false,
 });
 app.use("/api/auth", limiter);
 
-// CORS (FIXED)
+// GLOBAL PERMISSIVE CORS
 app.use(
   cors({
-    // origin: process.env.CLIENT_URL,
-    origin: "*",
+    origin: "*", // Allow all origins
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["*"], // Allow all headers
   }),
 );
 
+/* ---------------- STATIC FILES WITH PERMISSIVE CORS ---------------- */
+
+app.use(
+  "/uploads",
+  (req, res, next) => {
+    // Set extremely permissive headers
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header(
+      "Access-Control-Allow-Methods",
+      "GET, POST, PUT, DELETE, OPTIONS",
+    );
+    res.header("Access-Control-Allow-Headers", "*");
+
+    // Explicitly disable Content Security Policy for static files if possible
+    res.header("Cross-Origin-Resource-Policy", "cross-origin");
+
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(200);
+    }
+    next();
+  },
+  express.static(path.join(__dirname, "uploads")),
+);
+
 /* ---------------- ROUTES ---------------- */
-
-app.get("/health", (req, res) => {
-  res.json({
-    status: "UP",
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
-  });
-});
-
+// ... (routes stay the same)
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
-
+app.use("/api/teacher", teacherRoutes);
+app.use("/api/hod/dashboard", hodDashboardRoutes);
 /* ---------------- FALLBACK & ERROR ---------------- */
 
 app.use((req, res) => {

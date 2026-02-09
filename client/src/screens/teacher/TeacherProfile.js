@@ -15,6 +15,10 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
+// --- FIX: Import Expo Image Picker ---
+import * as ImagePicker from "expo-image-picker";
+import { getAccessToken } from "../../utils/storage";
+import { API_BASE_URL } from "../../utils/constants";
 
 const HEADER_HEIGHT = 260;
 
@@ -39,17 +43,13 @@ const TeacherProfile = () => {
       const res = await api.get("/teacher/profile");
       const data = res.data.data;
 
-      // Debugging: Log data to ensure backend is sending correct nested structure
       console.log("Loaded profile data:", JSON.stringify(data, null, 2));
 
       setProfile(data);
 
-      // --- IMPROVED MAPPING ---
-      // Explicitly check for nested objects and provide fallback to empty object
       const profDetails = data.professionalDetails || {};
       const personalInfo = data.personalInfo || {};
 
-      // Set state with null-checks to ensure strings are passed
       setBio(profDetails.bio || "");
       setQualification(profDetails.qualification || "");
       setExperience(profDetails.experience || "");
@@ -58,7 +58,6 @@ const TeacherProfile = () => {
       setEmail(personalInfo.email || "");
       setPhone(personalInfo.phone || "");
       setAddress(personalInfo.address || "");
-      // -----------------------------------------------------
     } catch (e) {
       console.error("Load profile error:", e);
       Alert.alert("Error", "Failed to load profile");
@@ -71,11 +70,92 @@ const TeacherProfile = () => {
     loadProfile();
   }, [loadProfile]);
 
+  // --- FIX: Updated Photo Handler for Expo ---
+  const handleCameraPress = async () => {
+    // 1. Request Permission
+    const permissionResult =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (permissionResult.granted === false) {
+      Alert.alert(
+        "Permission Required",
+        "You need to allow access to photos to update your profile picture.",
+      );
+      return;
+    }
+
+    // 2. Open Library
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (!result.canceled) {
+      await uploadPhoto(result.assets[0]);
+    }
+  };
+
+  // TeacherProfile.js
+
+  const uploadPhoto = async (file) => {
+    try {
+      setLoading(true);
+
+      const formData = new FormData();
+
+      // 1. Format the file correctly for FormData
+      const uri =
+        Platform.OS === "ios" ? file.uri.replace("file://", "") : file.uri;
+      const filename = file.fileName || uri.split("/").pop();
+      const type = file.mimeType || `image/${filename.split(".").pop()}`;
+
+      formData.append("profilePicture", {
+        uri: uri,
+        type: type,
+        name: filename,
+      });
+
+      console.log("Sending FormData with fetch:", formData);
+
+      // 2. Use fetch API
+      // --- FIX: Access Token from your storage utility ---
+      const token = await getAccessToken(); // Import this from your storage utils
+
+      // --- FIX: API Base URL ---
+      const response = await fetch(
+        `${API_BASE_URL}/teacher/profile/upload-photo`,
+        {
+          method: "POST",
+          body: formData,
+          headers: {
+            // --- CRUCIAL: Do NOT set Content-Type header ---
+            // Fetch will set it automatically with the boundary
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setProfile(result.data);
+        Alert.alert("Success", "Photo updated successfully");
+      } else {
+        throw new Error(result.message || "Upload failed");
+      }
+    } catch (e) {
+      console.error("Photo upload error:", e);
+      Alert.alert("Error", e.message || "Failed to upload photo");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const saveProfile = async () => {
     try {
       setSaving(true);
-
-      // Structure payload to match Mongoose schema nesting (dot notation)
       const updateData = {
         "professionalDetails.bio": bio,
         "professionalDetails.qualification": qualification,
@@ -86,11 +166,8 @@ const TeacherProfile = () => {
         "personalInfo.address": address,
       };
 
-      console.log("Sending update:", updateData);
-
       const response = await api.patch("/teacher/profile", updateData);
 
-      // Update UI immediately with backend response if full data is returned
       if (response.data.data) {
         setProfile(response.data.data);
         setEditing(false);
@@ -123,8 +200,14 @@ const TeacherProfile = () => {
       <View style={styles.header}>
         <View style={styles.photoContainer}>
           {profile?.personalInfo?.profilePicture ? (
+            // TeacherProfile.js (JSX)
+
             <Image
-              source={{ uri: profile.personalInfo.profilePicture }}
+              source={{
+                uri: profile?.personalInfo?.profilePicture
+                  ? `${API_BASE_URL.replace("/api", "")}${profile.personalInfo.profilePicture}`
+                  : "https://via.placeholder.com/150",
+              }}
               style={styles.profilePhoto}
             />
           ) : (
@@ -135,7 +218,11 @@ const TeacherProfile = () => {
               </Text>
             </View>
           )}
-          <TouchableOpacity style={styles.cameraBtn}>
+          {/* --- FIX: Attach handler here --- */}
+          <TouchableOpacity
+            style={styles.cameraBtn}
+            onPress={handleCameraPress}
+          >
             <Ionicons name="camera" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -150,7 +237,6 @@ const TeacherProfile = () => {
           style={styles.editBtn}
           onPress={() => {
             if (editing) {
-              // Cancel editing - reset form states to current profile values
               const currentProf = profile?.professionalDetails || {};
               const currentPersonal = profile?.personalInfo || {};
               setBio(currentProf.bio || "");

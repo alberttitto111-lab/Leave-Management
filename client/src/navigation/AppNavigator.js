@@ -14,21 +14,20 @@ import AdminDashboard from "../screens/dashboard/AdminDashboard";
 import UserManagementScreen from "../screens/admin/UserManagementScreen";
 import AddUserScreen from "../screens/admin/AddUserScreen";
 import BulkUploadScreen from "../screens/admin/BulkUploadScreen";
-
-// ✅ Department Screens
 import DepartmentsScreen from "../screens/admin/DepartmentScreen";
 import AddEditDepartmentScreen from "../screens/admin/AddEditDepartmentScreen";
+import EditUserScreen from "../screens/admin/EditUserScreen";
 
 // HOD Screens
-import HODDashboard from "../screens/dashboard/HODDashboard";
+import HODDashboard from "../screens/HOD/HODDashboard";
 
 // Teacher Screens
-import TeacherDashboard from "../screens/dashboard/TeacherDashboard";
+import TeacherDashboard from "../screens/teacher/TeacherDashboard";
+import TeacherProfile from "../screens/teacher/TeacherProfile";
+import StudentList from "../screens/teacher/StudentList";
 
 // Student Screens
 import StudentDashboard from "../screens/dashboard/StudentDashboard";
-
-import EditUserScreen from "../screens/admin/EditUserScreen";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -60,8 +59,6 @@ const AdminTabs = () => (
     <Tab.Screen name="Settings" component={AdminDashboard} />
   </Tab.Navigator>
 );
-
-/* -------------------- OTHER TABS (UNCHANGED) -------------------- */
 
 const HODTabs = () => (
   <Tab.Navigator
@@ -104,7 +101,7 @@ const TeacherTabs = () => (
     })}
   >
     <Tab.Screen name="Dashboard" component={TeacherDashboard} />
-    <Tab.Screen name="My Class" component={TeacherDashboard} />
+    <Tab.Screen name="My Class" component={StudentList} />
     <Tab.Screen name="Approvals" component={TeacherDashboard} />
   </Tab.Navigator>
 );
@@ -159,8 +156,6 @@ const AppNavigator = () => {
           {user?.role === USER_ROLES.ADMIN && (
             <>
               <Stack.Screen name="AdminMain" component={AdminTabs} />
-
-              {/* EXISTING */}
               <Stack.Screen
                 name="AddUser"
                 component={AddUserScreen}
@@ -191,8 +186,6 @@ const AppNavigator = () => {
                   headerTintColor: "#fff",
                 }}
               />
-
-              {/* ✅ NEW: DEPARTMENTS */}
               <Stack.Screen
                 name="Departments"
                 component={DepartmentsScreen}
@@ -219,12 +212,37 @@ const AppNavigator = () => {
           {user?.role === USER_ROLES.HOD && (
             <Stack.Screen name="HODMain" component={HODTabs} />
           )}
+
           {user?.role === USER_ROLES.TEACHER && (
-            <Stack.Screen name="TeacherMain" component={TeacherTabs} />
+            <>
+              <Stack.Screen name="TeacherMain" component={TeacherTabs} />
+              <Stack.Screen
+                name="TeacherProfile"
+                component={TeacherProfile}
+                options={{
+                  headerShown: true,
+                  title: "Profile",
+                  headerStyle: { backgroundColor: "#0D9488" },
+                  headerTintColor: "#fff",
+                }}
+              />
+              <Stack.Screen
+                name="StudentList"
+                component={StudentList}
+                options={{
+                  headerShown: true,
+                  title: "My Students",
+                  headerStyle: { backgroundColor: "#0D9488" },
+                  headerTintColor: "#fff",
+                }}
+              />
+            </>
           )}
+
           {user?.role === USER_ROLES.STUDENT && (
             <Stack.Screen name="StudentMain" component={StudentTabs} />
           )}
+
           {user?.role === USER_ROLES.STAFF && (
             <Stack.Screen name="StaffMain" component={StudentTabs} />
           )}

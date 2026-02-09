@@ -191,7 +191,7 @@ const AddUserScreen = ({ navigation }) => {
         },
       };
 
-      // Add academic info for students
+      // ✅ Add academic info for students
       if (role === "student") {
         payload.academicInfo = {
           rollNumber,
@@ -207,6 +207,28 @@ const AddUserScreen = ({ navigation }) => {
         };
       }
 
+      // ✅ Add teaching info for teachers
+      if (role === "teacher") {
+        payload.teachingInfo = {
+          classSections: teacherClasses
+            ? teacherClasses.split(",").map((s) => s.trim())
+            : [],
+          subjects: subjects ? subjects.split(",").map((s) => s.trim()) : [],
+          isClassTeacher: isClassTeacher,
+        };
+      }
+
+      // ✅ Add HOD info for HODs
+      if (role === "hod") {
+        payload.hodInfo = {
+          officeRoom: hodOffice || "",
+          // Note: managedDepartments should be set by admin separately or default to current dept
+          managedDepartments: departmentId ? [departmentId] : [],
+        };
+      }
+
+      console.log("Sending payload:", payload); // Debug log
+
       const response = await api.post("/admin/users", payload);
 
       Alert.alert(
@@ -215,9 +237,12 @@ const AddUserScreen = ({ navigation }) => {
         [{ text: "OK", onPress: () => navigation.goBack() }],
       );
     } catch (error) {
+      console.error("Create user error:", error.response?.data || error);
       Alert.alert(
         "Error",
-        error.response?.data?.message || "Failed to create user",
+        error.response?.data?.message ||
+          error.response?.data?.error ||
+          "Failed to create user",
       );
     } finally {
       setLoading(false);

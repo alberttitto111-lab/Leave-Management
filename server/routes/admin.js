@@ -24,8 +24,8 @@ router.post("/users", protect, authorize("admin"), async (req, res) => {
       personalInfo,
       departmentId,
       academicInfo,
-      teachingInfo, // ✅ added
-      hodInfo, // ✅ added
+      teachingInfo,
+      hodInfo,
     } = req.body;
 
     if (!userId || !role) {
@@ -37,24 +37,25 @@ router.post("/users", protect, authorize("admin"), async (req, res) => {
       return res.status(400).json({ message: "User ID already exists" });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // ❌ REMOVE manual hashing - let schema handle it
+    // const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await User.create({
       userId,
-      password: hashedPassword,
+      password, // ✅ Pass plain password - schema will hash it
       role,
       personalInfo,
       departmentId: role === "admin" ? null : departmentId,
-      mustChangePassword: true,
+      isFirstLogin: true, // ✅ Use isFirstLogin
 
-      // ✅ teacher support
+      // teacher support
       teachingInfo: role === "teacher" ? teachingInfo : undefined,
 
-      // ✅ hod support
+      // hod support
       hodInfo: role === "hod" ? hodInfo : undefined,
     });
 
-    // ✅ student academic record (unchanged)
+    // student academic record
     if (role === "student" && academicInfo) {
       await StudentAcademic.create({
         userId: user._id,
@@ -70,7 +71,7 @@ router.post("/users", protect, authorize("admin"), async (req, res) => {
         _id: user._id,
         userId: user.userId,
         role: user.role,
-        mustChangePassword: user.mustChangePassword,
+        isFirstLogin: user.isFirstLogin, // ✅ Updated
       },
     });
   } catch (err) {
@@ -112,16 +113,17 @@ router.post(
               const exists = await User.findOne({ userId: row.userId });
               if (exists) throw new Error("User already exists");
 
-              const hashedPassword = await bcrypt.hash(
-                row.password || "TempPass123!",
-                10,
-              );
+              // ❌ REMOVE manual hashing
+              // const hashedPassword = await bcrypt.hash(
+              //   row.password || "TempPass123!",
+              //   10,
+              // );
 
               const roleLower = row.role.toLowerCase();
 
               const user = await User.create({
                 userId: row.userId,
-                password: hashedPassword,
+                password: row.password || "TempPass123!", // ✅ Plain password
                 role: roleLower,
                 personalInfo: {
                   firstName: row.firstName,
@@ -130,9 +132,9 @@ router.post(
                   phone: row.phone,
                 },
                 departmentId: row.departmentId || null,
-                mustChangePassword: true,
+                isFirstLogin: true, // ✅ Use isFirstLogin
 
-                // ✅ teacher bulk support
+                // teacher bulk support
                 teachingInfo:
                   roleLower === "teacher"
                     ? {
@@ -141,7 +143,7 @@ router.post(
                       }
                     : undefined,
 
-                // ✅ hod bulk support
+                // hod bulk support
                 hodInfo:
                   roleLower === "hod"
                     ? {
@@ -150,7 +152,7 @@ router.post(
                     : undefined,
               });
 
-              // ✅ student academic (unchanged)
+              // student academic
               if (roleLower === "student") {
                 await StudentAcademic.create({
                   userId: user._id,
@@ -291,13 +293,14 @@ router.post(
   async (req, res) => {
     try {
       const password = req.body.newPassword || "TempPass123!";
-      const hashed = await bcrypt.hash(password, 10);
+      // ❌ REMOVE manual hashing
+      // const hashed = await bcrypt.hash(password, 10);
 
       const user = await User.findByIdAndUpdate(
         req.params.id,
         {
-          password: hashed,
-          mustChangePassword: true,
+          password, // ✅ Pass plain - schema will hash on next save
+          isFirstLogin: true, // ✅ Use isFirstLogin (force password change)
           updatedAt: new Date(),
         },
         { new: true },
@@ -432,34 +435,60 @@ router.get("/users/:id", protect, authorize("admin"), async (req, res) => {
 router.patch("/users/:id", protect, authorize("admin"), async (req, res) => {
   try {
     const {
+      userId,
       role,
       departmentId,
       personalInfo,
       academicInfo,
-      teachingInfo, // ✅ added
-      hodInfo, // ✅ added
+      teachingInfo,
+      hodInfo,
     } = req.body;
 
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      {
-        role,
-        departmentId: role !== "admin" ? departmentId : null,
-        personalInfo,
-
-        ...(role === "teacher" && { teachingInfo }),
-        ...(role === "hod" && { hodInfo }),
-      },
-      { new: true, runValidators: true },
-    );
-
-    if (!user) {
+    // Check if user exists
+    const existingUser = await User.findById(req.params.id);
+    if (!existingUser) {
       return res.status(404).json({ message: "User not found" });
     }
 
+    // If changing userId, check if new userId already exists (and it's not the same user)
+    if (userId && userId !== existingUser.userId) {
+      const userIdExists = await User.findOne({ userId });
+      if (userIdExists) {
+        return res.status(400).json({ message: "User ID already exists" });
+      }
+      existingUser.userId = userId;
+    }
+
+    // Update fields
+    if (role) existingUser.role = role;
+    if (personalInfo)
+      existingUser.personalInfo = {
+        ...existingUser.personalInfo,
+        ...personalInfo,
+      };
+
+    // Handle department
+    if (role !== "admin") {
+      existingUser.departmentId = departmentId || null;
+    } else {
+      existingUser.departmentId = null;
+    }
+
+    // Handle role-specific info
+    if (role === "teacher" && teachingInfo) {
+      existingUser.teachingInfo = teachingInfo;
+    }
+    if (role === "hod" && hodInfo) {
+      existingUser.hodInfo = hodInfo;
+    }
+
+    // Save to trigger pre("save") hook if password was modified
+    await existingUser.save();
+
+    // Handle student academic info
     if (role === "student" && academicInfo) {
       await StudentAcademic.findOneAndUpdate(
-        { userId: user._id },
+        { userId: existingUser._id },
         {
           academicInfo,
           classTeacherId: academicInfo.classTeacherId,
@@ -469,10 +498,19 @@ router.patch("/users/:id", protect, authorize("admin"), async (req, res) => {
       );
     }
 
-    res.json({ message: "User updated successfully", user });
+    res.json({
+      message: "User updated successfully",
+      user: {
+        _id: existingUser._id,
+        userId: existingUser.userId,
+        role: existingUser.role,
+        personalInfo: existingUser.personalInfo,
+        departmentId: existingUser.departmentId,
+      },
+    });
   } catch (err) {
+    console.error("Update user error:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 });
-
 export default router;

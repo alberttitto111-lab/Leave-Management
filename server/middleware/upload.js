@@ -24,13 +24,33 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
+    fileSize: 50 * 1024 * 1024, // 10MB
   },
   fileFilter: (req, file, cb) => {
-    const allowed = ["text/csv", "application/vnd.ms-excel", "text/plain"];
+    // --- UPDATED: Allowed MIME types ---
+    const allowedMimeTypes = [
+      // Images
+      "image/jpeg",
+      "image/png",
+      "image/jpg",
+      "image/gif",
+      // Documents
+      "application/pdf", // PDF
+      "application/msword", // DOC
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // DOCX
+      "application/vnd.ms-excel", // XLS
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // XLSX
+      "text/csv", // CSV
+      "text/plain", // TXT
+    ];
 
-    if (!allowed.includes(file.mimetype)) {
-      cb(new Error("Only CSV files are allowed"), false);
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      cb(
+        new Error(
+          "File type not allowed. Please upload images, PDFs, or office documents.",
+        ),
+        false,
+      );
     } else {
       cb(null, true);
     }

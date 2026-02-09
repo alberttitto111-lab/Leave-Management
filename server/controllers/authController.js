@@ -4,8 +4,8 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ErrorResponse from "../utils/ErrorResponse.js";
 import logger from "../utils/logger.js";
 
-const JWT_ACCESS_EXPIRE = "15m";
-const JWT_REFRESH_EXPIRE = "7d";
+const JWT_ACCESS_EXPIRE = "60m";
+const JWT_REFRESH_EXPIRE = "360d";
 
 const COOKIE_OPTIONS = {
   httpOnly: true,

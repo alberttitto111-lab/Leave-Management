@@ -94,7 +94,6 @@ const EditUserScreen = ({ navigation, route }) => {
 
   const handleUpdate = async () => {
     if (isUpdated) {
-      // Navigate back to UserManagement inside Admin tabs
       navigation.navigate("AdminMain", {
         screen: "Users",
         params: { refresh: true },
@@ -105,7 +104,7 @@ const EditUserScreen = ({ navigation, route }) => {
     setLoading(true);
     try {
       const payload = {
-        userId: newUserId,
+        userId: newUserId, // Send the potentially updated userId
         role,
         departmentId: role !== "admin" ? departmentId : null,
         personalInfo: { firstName, lastName, email, phone, gender, address },
@@ -121,6 +120,26 @@ const EditUserScreen = ({ navigation, route }) => {
         };
       }
 
+      // ✅ Add support for teacher/HOD updates if needed
+      // You'll need to add state variables for these in your component
+      if (role === "teacher") {
+        payload.teachingInfo = {
+          classSections: [], // Add state for this if you want to edit it
+          subjects: [],
+          isClassTeacher: false,
+        };
+      }
+
+      if (role === "hod") {
+        payload.hodInfo = {
+          officeRoom: "", // Add state for this if you want to edit it
+          managedDepartments: departmentId ? [departmentId] : [],
+        };
+      }
+
+      console.log("Updating user with ID:", initialUserId); // Debug log
+      console.log("Payload:", payload); // Debug log
+
       await api.patch(`/admin/users/${initialUserId}`, payload);
 
       setIsUpdated(true);
@@ -129,7 +148,13 @@ const EditUserScreen = ({ navigation, route }) => {
         Alert.alert("Success", "User profile updated. Click again to return.");
       }
     } catch (error) {
-      Alert.alert("Error", error.response?.data?.message || "Update failed");
+      console.error("Update error:", error.response?.data || error);
+      Alert.alert(
+        "Error",
+        error.response?.data?.message ||
+          error.response?.data?.error ||
+          "Update failed",
+      );
     } finally {
       setLoading(false);
     }

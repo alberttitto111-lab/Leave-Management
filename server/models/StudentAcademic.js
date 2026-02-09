@@ -6,91 +6,59 @@ const studentAcademicSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      unique: true,
-      index: true,
+      unique: true, // One academic record per student
     },
 
     academicInfo: {
       rollNumber: {
         type: String,
         required: true,
-        unique: true,
-        index: true,
-        trim: true,
+        // ❌ REMOVE: unique: true (we'll use compound index instead)
       },
-
       class: {
         type: String,
         required: true,
-        index: true,
-        trim: true,
       },
-
       section: {
         type: String,
         required: true,
-        trim: true,
       },
-
       batchYear: {
         type: Number,
-        required: true,
-        index: true,
+        default: () => new Date().getFullYear(),
       },
-
       parentDetails: {
-        fatherName: { type: String, trim: true },
-        motherName: { type: String, trim: true },
-        parentPhone: { type: String, trim: true },
-        parentEmail: { type: String, trim: true, lowercase: true },
+        fatherName: String,
+        motherName: String,
+        parentPhone: String,
+        parentEmail: String,
       },
-
-      guardianName: { type: String, trim: true },
-      guardianPhone: { type: String, trim: true },
     },
 
     classTeacherId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      default: null,
     },
 
     hodId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      default: null,
-    },
-
-    attendanceStats: {
-      totalDays: { type: Number, default: 0 },
-      presentDays: { type: Number, default: 0 },
-      absentDays: { type: Number, default: 0 },
-      leavePercentage: {
-        type: Number,
-        default: 0,
-        min: 0,
-        max: 100,
-      },
     },
   },
-  { timestamps: true },
+  {
+    timestamps: true,
+  },
 );
 
-/**
- * ✅ Mongoose 7+ compatible middleware
- * ❌ NO next()
- * ❌ NO callback arguments
- */
-studentAcademicSchema.pre("save", function () {
-  const stats = this.attendanceStats;
-
-  if (!stats) return;
-
-  if (stats.totalDays > 0) {
-    stats.leavePercentage = (stats.absentDays / stats.totalDays) * 100;
-  } else {
-    stats.leavePercentage = 0;
-  }
-});
+// ✅ COMPOUND UNIQUE INDEX: Same roll number allowed in different classes/sections
+// But NOT allowed in same class-section combination
+studentAcademicSchema.index(
+  {
+    "academicInfo.class": 1,
+    "academicInfo.section": 1,
+    "academicInfo.rollNumber": 1,
+  },
+  { unique: true },
+);
 
 export default mongoose.model("StudentAcademic", studentAcademicSchema);
