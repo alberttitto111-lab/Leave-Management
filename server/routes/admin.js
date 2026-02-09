@@ -10,6 +10,7 @@ import mongoose from "mongoose";
 
 import { protect, authorize } from "../middleware/auth.js";
 import upload from "../middleware/upload.js";
+import LeaveType from "../models/LeaveType.js";
 
 const router = express.Router();
 
@@ -574,4 +575,182 @@ router.delete("/users/:id", protect, authorize("admin"), async (req, res) => {
     });
   }
 });
+
+/* =========================
+   LEAVE TYPES MANAGEMENT
+========================= */
+
+// GET all leave types
+router.get("/leave-types", protect, authorize("admin"), async (req, res) => {
+  try {
+    const leaveTypes = await LeaveType.find().sort({ createdAt: -1 });
+    res.json({
+      success: true,
+      data: leaveTypes,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch leave types",
+      error: err.message,
+    });
+  }
+});
+
+// CREATE new leave type
+router.post("/leave-types", protect, authorize("admin"), async (req, res) => {
+  try {
+    const {
+      name,
+      code,
+      color,
+      maxDaysPerYear,
+      maxDaysPerMonth,
+      requiresDocument,
+      approvalHierarchy,
+      applicableTo,
+      isPaid,
+      carryForward,
+      isActive,
+    } = req.body;
+
+    // Validation
+    if (!name || !code) {
+      return res.status(400).json({
+        success: false,
+        message: "Name and code are required",
+      });
+    }
+
+    // Check if code already exists
+    const existing = await LeaveType.findOne({ code: code.toUpperCase() });
+    if (existing) {
+      return res.status(400).json({
+        success: false,
+        message: "Leave type with this code already exists",
+      });
+    }
+
+    const leaveType = await LeaveType.create({
+      name,
+      code: code.toUpperCase(),
+      color: color || "#3B82F6",
+      maxDaysPerYear: maxDaysPerYear || 0,
+      maxDaysPerMonth: maxDaysPerMonth || 0,
+      requiresDocument: requiresDocument || false,
+      approvalHierarchy: approvalHierarchy || [{ level: 1, role: "teacher" }],
+      applicableTo: applicableTo || ["all"],
+      isPaid: isPaid || false,
+      carryForward: carryForward || false,
+      isActive: isActive !== undefined ? isActive : true,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Leave type created successfully",
+      data: leaveType,
+    });
+  } catch (err) {
+    console.error("Create leave type error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to create leave type",
+      error: err.message,
+    });
+  }
+});
+
+// UPDATE leave type
+router.patch(
+  "/leave-types/:id",
+  protect,
+  authorize("admin"),
+  async (req, res) => {
+    try {
+      const leaveTypeId = req.params.id;
+
+      if (!mongoose.Types.ObjectId.isValid(leaveTypeId)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid leave type ID",
+        });
+      }
+
+      const updateData = { ...req.body };
+      if (updateData.code) {
+        updateData.code = updateData.code.toUpperCase();
+      }
+
+      const leaveType = await LeaveType.findByIdAndUpdate(
+        leaveTypeId,
+        updateData,
+        { new: true, runValidators: true },
+      );
+
+      if (!leaveType) {
+        return res.status(404).json({
+          success: false,
+          message: "Leave type not found",
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Leave type updated successfully",
+        data: leaveType,
+      });
+    } catch (err) {
+      console.error("Update leave type error:", err);
+      res.status(500).json({
+        success: false,
+        message: "Failed to update leave type",
+        error: err.message,
+      });
+    }
+  },
+);
+
+// DELETE leave type
+router.delete(
+  "/leave-types/:id",
+  protect,
+  authorize("admin"),
+  async (req, res) => {
+    try {
+      const leaveTypeId = req.params.id;
+
+      if (!mongoose.Types.ObjectId.isValid(leaveTypeId)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid leave type ID",
+        });
+      }
+
+      const leaveType = await LeaveType.findByIdAndDelete(leaveTypeId);
+
+      if (!leaveType) {
+        return res.status(404).json({
+          success: false,
+          message: "Leave type not found",
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Leave type deleted successfully",
+        data: {
+          deletedId: leaveType._id,
+          name: leaveType.name,
+        },
+      });
+    } catch (err) {
+      console.error("Delete leave type error:", err);
+      res.status(500).json({
+        success: false,
+        message: "Failed to delete leave type",
+        error: err.message,
+      });
+    }
+  },
+);
 export default router;

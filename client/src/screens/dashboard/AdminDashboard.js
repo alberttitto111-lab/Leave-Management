@@ -82,7 +82,7 @@ const AdminDashboard = ({ navigation }) => {
     {
       title: "Leave Types",
       icon: "calendar",
-      screen: null,
+      screen: "LeaveTypes", // Change from null to "LeaveTypes"
       color: COLORS.warning,
     },
   ];

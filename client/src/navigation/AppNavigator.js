@@ -17,6 +17,7 @@ import BulkUploadScreen from "../screens/admin/BulkUploadScreen";
 import DepartmentsScreen from "../screens/admin/DepartmentScreen";
 import AddEditDepartmentScreen from "../screens/admin/AddEditDepartmentScreen";
 import EditUserScreen from "../screens/admin/EditUserScreen";
+import LeaveTypesManagementScreen from "../screens/admin/LeaveTypesManagementScreen"; // <-- ADD THIS IMPORT
 
 // HOD Screens
 import HODDashboard from "../screens/HOD/HODDashboard";
@@ -225,6 +226,14 @@ const AppNavigator = () => {
                   title: "Department",
                   headerStyle: { backgroundColor: "#7C3AED" },
                   headerTintColor: "#fff",
+                }}
+              />
+              {/* ADD THIS NEW SCREEN */}
+              <Stack.Screen
+                name="LeaveTypes"
+                component={LeaveTypesManagementScreen}
+                options={{
+                  headerShown: false, // We have custom header in the component
                 }}
               />
             </>
