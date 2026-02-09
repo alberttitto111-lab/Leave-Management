@@ -10,48 +10,59 @@ import {
   RefreshControl,
   Modal,
   SafeAreaView,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { useFocusEffect } from "@react-navigation/native";
 
-const UserItem = ({ user, onPress }) => (
-  <TouchableOpacity style={styles.userItem} onPress={() => onPress(user)}>
-    <View style={styles.userAvatar}>
-      <Text style={styles.avatarText}>
-        {user.personalInfo?.firstName?.[0]}
-        {user.personalInfo?.lastName?.[0]}
-      </Text>
-    </View>
-    <View style={styles.userInfo}>
-      <Text style={styles.userName}>
-        {user.personalInfo?.firstName} {user.personalInfo?.lastName}
-      </Text>
-      <Text style={styles.userId}>{user.userId}</Text>
-      <View style={styles.userMeta}>
+const UserItem = ({ user, onPress, onDelete }) => (
+  <View style={styles.userItem}>
+    <TouchableOpacity style={styles.userContent} onPress={() => onPress(user)}>
+      <View style={styles.userAvatar}>
+        <Text style={styles.avatarText}>
+          {user.personalInfo?.firstName?.[0]}
+          {user.personalInfo?.lastName?.[0]}
+        </Text>
+      </View>
+      <View style={styles.userInfo}>
+        <Text style={styles.userName}>
+          {user.personalInfo?.firstName} {user.personalInfo?.lastName}
+        </Text>
+        <Text style={styles.userId}>{user.userId}</Text>
+        <View style={styles.userMeta}>
+          <View
+            style={[
+              styles.roleBadge,
+              { backgroundColor: getRoleColor(user.role) },
+            ]}
+          >
+            <Text style={styles.roleText}>{user.role.toUpperCase()}</Text>
+          </View>
+          {user.departmentId && (
+            <Text style={styles.deptText}>{user.departmentId.name}</Text>
+          )}
+        </View>
+      </View>
+      <View style={styles.userStatus}>
         <View
           style={[
-            styles.roleBadge,
-            { backgroundColor: getRoleColor(user.role) },
+            styles.statusDot,
+            { backgroundColor: user.isActive ? "#10B981" : "#EF4444" },
           ]}
-        >
-          <Text style={styles.roleText}>{user.role.toUpperCase()}</Text>
-        </View>
-        {user.departmentId && (
-          <Text style={styles.deptText}>{user.departmentId.name}</Text>
-        )}
+        />
+        <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
       </View>
-    </View>
-    <View style={styles.userStatus}>
-      <View
-        style={[
-          styles.statusDot,
-          { backgroundColor: user.isActive ? "#10B981" : "#EF4444" },
-        ]}
-      />
-      <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
-    </View>
-  </TouchableOpacity>
+    </TouchableOpacity>
+
+    {/* Delete Button */}
+    <TouchableOpacity
+      style={styles.deleteButton}
+      onPress={() => onDelete(user)}
+    >
+      <Ionicons name="trash-outline" size={20} color="#EF4444" />
+    </TouchableOpacity>
+  </View>
 );
 
 const getRoleColor = (role) => {
@@ -74,6 +85,8 @@ const UserManagementScreen = ({ navigation }) => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
 
   const roles = ["all", "student", "teacher", "hod", "staff", "admin"];
 
@@ -124,6 +137,66 @@ const UserManagementScreen = ({ navigation }) => {
   const handleSearch = () => {
     setLoading(true);
     fetchUsers(1, true);
+  };
+
+  const handleDeletePress = (user) => {
+    console.log("Opening delete modal for user:", user.userId);
+    setUserToDelete(user);
+    setDeleteModalVisible(true);
+  };
+
+  const confirmDelete = async () => {
+    console.log("=== CONFIRM DELETE STARTED ===");
+    console.log("User to delete:", userToDelete?._id);
+
+    if (!userToDelete) {
+      console.error("No user set to delete!");
+      return;
+    }
+
+    try {
+      console.log(
+        "Making API delete call to:",
+        `/admin/users/${userToDelete._id}`,
+      );
+      const response = await api.delete(`/admin/users/${userToDelete._id}`);
+
+      console.log("API Response:", response.data);
+
+      if (response.data?.success) {
+        console.log("Delete successful, removing from local state");
+        setUsers((prev) => prev.filter((u) => u._id !== userToDelete._id));
+        setDeleteModalVisible(false);
+        setUserToDelete(null);
+        Alert.alert("Success", "User deleted successfully");
+      } else {
+        console.error("Server returned success:false", response.data);
+        Alert.alert("Error", response.data?.message || "Failed to delete user");
+      }
+    } catch (err) {
+      console.error("=== API ERROR ===");
+      console.error("Error type:", err.name);
+      console.error("Error message:", err.message);
+
+      if (err.response) {
+        console.error("Server responded with error:");
+        console.error("Status:", err.response.status);
+        console.error("Data:", err.response.data);
+        Alert.alert(
+          "Server Error",
+          err.response?.data?.message || `Error ${err.response.status}`,
+        );
+      } else if (err.request) {
+        console.error("No response received - network error");
+        Alert.alert(
+          "Network Error",
+          "Cannot connect to server. Check your network and server status.",
+        );
+      } else {
+        console.error("Request setup error:", err.message);
+        Alert.alert("Error", "Failed to make request: " + err.message);
+      }
+    }
   };
 
   const renderFooter = () => {
@@ -187,6 +260,7 @@ const UserManagementScreen = ({ navigation }) => {
             onPress={(user) =>
               navigation.navigate("EditUser", { userId: user._id })
             }
+            onDelete={handleDeletePress}
           />
         )}
         keyExtractor={(item) => item._id}
@@ -250,6 +324,55 @@ const UserManagementScreen = ({ navigation }) => {
                 )}
               </TouchableOpacity>
             ))}
+          </View>
+        </View>
+      </Modal>
+
+      {/* DELETE CONFIRMATION MODAL */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={deleteModalVisible}
+        onRequestClose={() => setDeleteModalVisible(false)}
+      >
+        <View style={styles.deleteModalOverlay}>
+          <View style={styles.deleteModalContent}>
+            <Ionicons
+              name="warning"
+              size={48}
+              color="#EF4444"
+              style={styles.deleteModalIcon}
+            />
+            <Text style={styles.deleteModalTitle}>Delete User</Text>
+            <Text style={styles.deleteModalText}>
+              Are you sure you want to delete{" "}
+              {userToDelete?.personalInfo?.firstName}{" "}
+              {userToDelete?.personalInfo?.lastName} ({userToDelete?.userId})?
+              This action cannot be undone.
+            </Text>
+
+            <View style={styles.deleteModalButtons}>
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.cancelButton]}
+                onPress={() => {
+                  console.log("Modal cancel pressed");
+                  setDeleteModalVisible(false);
+                  setUserToDelete(null);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.confirmDeleteButton]}
+                onPress={() => {
+                  console.log("Modal confirm delete pressed");
+                  confirmDelete();
+                }}
+              >
+                <Text style={styles.confirmDeleteButtonText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -318,7 +441,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     backgroundColor: "#fff",
     borderRadius: 12,
-    padding: 16,
     marginBottom: 12,
     alignItems: "center",
     shadowColor: "#000",
@@ -326,6 +448,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 2,
+  },
+  userContent: {
+    flex: 1,
+    flexDirection: "row",
+    padding: 16,
+    alignItems: "center",
   },
   userAvatar: {
     width: 50,
@@ -384,6 +512,11 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
   },
+  deleteButton: {
+    padding: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   footer: {
     paddingVertical: 20,
   },
@@ -440,6 +573,68 @@ const styles = StyleSheet.create({
   roleOptionTextSelected: {
     color: "#7C3AED",
     fontWeight: "600",
+  },
+  // Delete Modal Styles
+  deleteModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  deleteModalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 24,
+    width: "85%",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  deleteModalIcon: {
+    marginBottom: 16,
+  },
+  deleteModalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1E293B",
+    marginBottom: 12,
+  },
+  deleteModalText: {
+    fontSize: 14,
+    color: "#64748B",
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  deleteModalButtons: {
+    flexDirection: "row",
+    gap: 12,
+    width: "100%",
+  },
+  deleteModalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  cancelButton: {
+    backgroundColor: "#F1F5F9",
+  },
+  cancelButtonText: {
+    color: "#475569",
+    fontWeight: "600",
+    fontSize: 15,
+  },
+  confirmDeleteButton: {
+    backgroundColor: "#EF4444",
+  },
+  confirmDeleteButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 15,
   },
 });
 

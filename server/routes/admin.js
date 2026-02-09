@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import User from "../models/User.js";
 import Department from "../models/Department.js";
 import StudentAcademic from "../models/StudentAcademic.js";
+import mongoose from "mongoose";
 
 import { protect, authorize } from "../middleware/auth.js";
 import upload from "../middleware/upload.js";
@@ -511,6 +512,66 @@ router.patch("/users/:id", protect, authorize("admin"), async (req, res) => {
   } catch (err) {
     console.error("Update user error:", err);
     res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
+/* =========================
+   DELETE USER
+========================= */
+router.delete("/users/:id", protect, authorize("admin"), async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    // Validate ID format
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format",
+      });
+    }
+
+    // Find user first to check if exists and get role
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Prevent admin from deleting themselves
+    if (user._id.toString() === req.user.id) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot delete your own account",
+      });
+    }
+
+    // Delete role-specific records
+    if (user.role === "student") {
+      await StudentAcademic.findOneAndDelete({ userId: user._id });
+    }
+
+    // Delete the user
+    await User.findByIdAndDelete(userId);
+
+    res.json({
+      success: true,
+      message: "User deleted successfully",
+      data: {
+        deletedUserId: user._id,
+        userId: user.userId,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    console.error("Delete user error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: err.message,
+    });
   }
 });
 export default router;

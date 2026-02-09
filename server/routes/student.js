@@ -297,6 +297,59 @@ router.get("/download-letter/:leaveId", async (req, res) => {
       .json({ success: false, message: "Server error", error: err.message });
   }
 });
+// DELETE /api/student/leave/:id - DELETE LEAVE REQUEST
+router.delete("/leave/:id", async (req, res) => {
+  try {
+    const leaveId = req.params.id;
+
+    // Validate ID format
+    if (!mongoose.Types.ObjectId.isValid(leaveId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid leave ID format",
+      });
+    }
+
+    const leave = await LeaveRequest.findById(leaveId);
+
+    if (!leave) {
+      return res.status(404).json({
+        success: false,
+        message: "Leave not found",
+      });
+    }
+
+    // Check ownership
+    if (leave.applicantId.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: "Not allowed to delete this leave",
+      });
+    }
+
+    // Only allow deletion if still pending
+    if (leave.finalStatus !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot delete leave that is already approved or rejected",
+      });
+    }
+
+    await LeaveRequest.findByIdAndDelete(leaveId);
+
+    return res.json({
+      success: true,
+      message: "Leave deleted successfully",
+    });
+  } catch (err) {
+    console.error("Delete leave error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: err.message,
+    });
+  }
+});
 
 // GET /api/student/leave-balance/:leaveTypeId - Get remaining balance for a leave type
 router.get("/leave-balance/:leaveTypeId", async (req, res) => {
