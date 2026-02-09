@@ -21,6 +21,7 @@
     "cors": "^2.8.6",
     "csv-parser": "^3.2.0",
     "dotenv": "^17.2.3",
+    "expo-server-sdk": "^5.0.0",
     "express": "^5.2.1",
     "express-async-handler": "^1.2.0",
     "express-rate-limit": "^8.2.1",
@@ -30,6 +31,7 @@
     "mongo-sanitize": "^1.1.0",
     "mongoose": "^9.1.5",
     "multer": "^2.0.2",
+    "pdfkit": "^0.17.2",
     "winston": "^3.19.0"
   },
   "devDependencies": {

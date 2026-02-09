@@ -87,6 +87,13 @@ const LeaveCard = ({ leave, onApprove, onReject }) => (
         <Ionicons name="close-circle" size={20} color="#fff" />
         <Text style={styles.actionBtnText}>Reject</Text>
       </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.actionCard}
+        onPress={() => navigation.navigate("TeacherLeaveRequests")}
+      >
+        <Ionicons name="time" size={28} color="#F59E0B" />
+        <Text style={styles.actionText}>Leave Requests</Text>
+      </TouchableOpacity>
     </View>
   </View>
 );
@@ -312,7 +319,9 @@ const TeacherDashboard = ({ navigation }) => {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Pending Leave Approvals</Text>
-          <TouchableOpacity onPress={() => navigation.navigate("AllLeaves")}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate("TeacherLeaveRequests")}
+          >
             <Text style={styles.seeAll}>See All</Text>
           </TouchableOpacity>
         </View>

@@ -14,7 +14,8 @@ import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
 import logger from "./utils/logger.js";
 import teacherRoutes from "./routes/teacher.js";
-import hodDashboardRoutes from "./routes/hod.js";
+import hodRoutes from "./routes/hod.js";
+import studentRoutes from "./routes/student.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -81,8 +82,10 @@ app.use(
 // ... (routes stay the same)
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/student", studentRoutes);
 app.use("/api/teacher", teacherRoutes);
-app.use("/api/hod/dashboard", hodDashboardRoutes);
+app.use("/api/hod", hodRoutes);
+app.use("/uploads/letters", express.static("uploads/letters"));
 /* ---------------- FALLBACK & ERROR ---------------- */
 
 app.use((req, res) => {

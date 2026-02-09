@@ -1,68 +1,31 @@
 import mongoose from "mongoose";
 
-const approvalSchema = new mongoose.Schema(
-  {
-    level: { type: Number, required: true },
-    role: { type: String, required: true },
-    approverId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: null,
-    },
-    status: {
-      type: String,
-      enum: ["pending", "approved", "rejected"],
-      default: "pending",
-    },
-    remarks: { type: String, default: "" },
-    actionAt: { type: Date, default: null },
+const approvalSchema = new mongoose.Schema({
+  level: { type: Number, required: true }, // 1 = Teacher, 2 = HOD
+  approverId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
   },
-  { _id: false },
-);
-
-const attachmentSchema = new mongoose.Schema(
-  {
-    url: { type: String, required: true },
-    type: { type: String, required: true },
-    name: { type: String, required: true },
-    size: { type: Number, default: 0 },
+  status: {
+    type: String,
+    enum: ["pending", "approved", "rejected"],
+    default: "pending",
   },
-  { _id: false },
-);
-
-const notificationSchema = new mongoose.Schema(
-  {
-    type: {
-      type: String,
-      enum: ["sms", "email", "push"],
-      required: true,
-    },
-    sentAt: { type: Date, default: Date.now },
-    status: { type: String, default: "sent" },
-    recipient: { type: String },
-  },
-  { _id: false },
-);
+  remarks: { type: String },
+  approvedAt: { type: Date },
+  rejectedAt: { type: Date },
+});
 
 const leaveRequestSchema = new mongoose.Schema(
   {
-    requestId: {
-      type: String,
-      required: true,
-      unique: true,
-      index: true,
-    },
+    requestId: { type: String, required: true, unique: true },
     applicantId: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      index: true,
     },
-    applicantType: {
-      type: String,
-      enum: ["student", "teacher", "staff"],
-      required: true,
-    },
+    applicantType: { type: String, enum: ["student", "staff"], required: true },
     leaveType: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "LeaveType",
@@ -71,56 +34,65 @@ const leaveRequestSchema = new mongoose.Schema(
     dateRange: {
       from: { type: Date, required: true },
       to: { type: Date, required: true },
-      days: { type: Number, required: true, min: 0.5 },
-      halfDay: {
+      days: { type: Number, required: true },
+      halfDay: { type: Boolean, default: false },
+      halfDayType: {
         type: String,
-        enum: ["morning", "afternoon", null],
+        enum: ["first", "second", null],
         default: null,
       },
     },
-    reason: {
-      type: String,
-      required: true,
-      trim: true,
-      maxlength: 1000,
-    },
-    attachments: [attachmentSchema],
+    reason: { type: String, required: true },
+    attachments: [
+      {
+        url: String,
+        type: String,
+        name: String,
+        size: Number,
+      },
+    ],
     status: {
       type: String,
-      enum: ["pending", "approved", "rejected", "cancelled", "escalated"],
+      enum: [
+        "pending",
+        "approved_by_teacher",
+        "approved_by_hod",
+        "rejected",
+        "cancelled",
+      ],
       default: "pending",
-      index: true,
     },
+    currentLevel: { type: Number, default: 1 }, // 1 = Teacher, 2 = HOD
     approvals: [approvalSchema],
-    currentLevel: {
-      type: Number,
-      default: 1,
+    finalStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
     },
-    isEscalated: {
-      type: Boolean,
-      default: false,
+
+    // For generated documents
+    approvalLetter: {
+      url: String,
+      generatedAt: Date,
+      generatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     },
-    escalatedTo: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: null,
+    rejectionLetter: {
+      url: String,
+      generatedAt: Date,
+      generatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      reason: String,
     },
-    substituteTeacherId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: null,
-    },
-    notificationsSent: [notificationSchema],
-    parentNotified: {
-      type: Boolean,
-      default: false,
+
+    notificationsSent: {
+      teacher: { type: Boolean, default: false },
+      hod: { type: Boolean, default: false },
+      student: { type: Boolean, default: false },
     },
   },
   { timestamps: true },
 );
 
-// Index for efficient querying
 leaveRequestSchema.index({ applicantId: 1, status: 1 });
-leaveRequestSchema.index({ "dateRange.from": 1, "dateRange.to": 1 });
+leaveRequestSchema.index({ currentLevel: 1, status: 1 });
 
 export default mongoose.model("LeaveRequest", leaveRequestSchema);

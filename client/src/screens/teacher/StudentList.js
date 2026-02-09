@@ -1,4 +1,3 @@
-// screens/teacher/StudentList.js
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -12,27 +11,35 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 
+/* ---------------- CARD ---------------- */
+
 const StudentCard = ({ student, onPress }) => (
   <TouchableOpacity style={styles.card} onPress={() => onPress(student)}>
     <View style={styles.avatar}>
       <Text style={styles.avatarText}>
-        {student.personalInfo?.firstName?.[0]}
-        {student.personalInfo?.lastName?.[0]}
+        {student?.personalInfo?.firstName?.[0] || ""}
+        {student?.personalInfo?.lastName?.[0] || ""}
       </Text>
     </View>
+
     <View style={styles.info}>
       <Text style={styles.name}>
-        {student.personalInfo?.firstName} {student.personalInfo?.lastName}
+        {student?.personalInfo?.firstName} {student?.personalInfo?.lastName}
       </Text>
+
       <Text style={styles.details}>
-        {student.academicInfo?.class}-{student.academicInfo?.section} • Roll:{" "}
-        {student.academicInfo?.rollNumber}
+        {student?.academicInfo?.class}-{student?.academicInfo?.section} • Roll:{" "}
+        {student?.academicInfo?.rollNumber}
       </Text>
-      <Text style={styles.id}>{student.userId}</Text>
+
+      <Text style={styles.id}>{student?.userId}</Text>
     </View>
+
     <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
   </TouchableOpacity>
 );
+
+/* ---------------- MAIN ---------------- */
 
 const StudentList = ({ navigation }) => {
   const [students, setStudents] = useState([]);
@@ -49,33 +56,54 @@ const StudentList = ({ navigation }) => {
     filterStudents();
   }, [searchQuery, students]);
 
+  /* ---------------- LOAD ---------------- */
+
   const loadStudents = async () => {
     try {
       const response = await api.get("/teacher/students");
-      setStudents(response.data.data);
+
+      console.log("Students API response:", response.data);
+
+      // Accept multiple backend shapes safely
+      const list =
+        response?.data?.data ||
+        response?.data?.students ||
+        response?.data ||
+        [];
+
+      setStudents(Array.isArray(list) ? list : []);
     } catch (error) {
-      console.error(error);
+      console.error("Load students error:", error);
+      setStudents([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
+  /* ---------------- FILTER ---------------- */
+
   const filterStudents = () => {
     if (!searchQuery) {
-      setFilteredStudents(students);
+      setFilteredStudents(students || []);
       return;
     }
+
     const query = searchQuery.toLowerCase();
-    const filtered = students.filter(
-      (s) =>
-        s.userId.toLowerCase().includes(query) ||
-        s.personalInfo?.firstName?.toLowerCase().includes(query) ||
-        s.personalInfo?.lastName?.toLowerCase().includes(query) ||
-        s.academicInfo?.rollNumber?.toString().includes(query),
-    );
+
+    const filtered = (students || []).filter((s) => {
+      return (
+        s?.userId?.toLowerCase?.().includes(query) ||
+        s?.personalInfo?.firstName?.toLowerCase?.().includes(query) ||
+        s?.personalInfo?.lastName?.toLowerCase?.().includes(query) ||
+        s?.academicInfo?.rollNumber?.toString?.().includes(query)
+      );
+    });
+
     setFilteredStudents(filtered);
   };
+
+  /* ---------------- HANDLERS ---------------- */
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -86,11 +114,15 @@ const StudentList = ({ navigation }) => {
     navigation.navigate("StudentDetail", { studentId: student._id });
   };
 
+  /* ---------------- UI ---------------- */
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>My Students</Text>
-        <Text style={styles.subtitle}>{students.length} students assigned</Text>
+        <Text style={styles.subtitle}>
+          {students?.length || 0} students assigned
+        </Text>
       </View>
 
       <View style={styles.searchContainer}>
@@ -104,7 +136,7 @@ const StudentList = ({ navigation }) => {
       </View>
 
       <FlatList
-        data={filteredStudents}
+        data={filteredStudents || []}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => (
           <StudentCard student={item} onPress={handleStudentPress} />
@@ -123,6 +155,8 @@ const StudentList = ({ navigation }) => {
     </View>
   );
 };
+
+/* ---------------- STYLES ---------------- */
 
 const styles = StyleSheet.create({
   container: {

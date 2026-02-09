@@ -1,390 +1,437 @@
 import express from "express";
+import LeaveRequest from "../models/LeaveRequest.js";
 import User from "../models/User.js";
 import StudentAcademic from "../models/StudentAcademic.js";
-import Leave from "../models/Leave.js";
 import { protect, authorize } from "../middleware/auth.js";
-import upload from "../middleware/upload.js";
-import path from "path";
-import fs from "fs";
+import {
+  notifyHODOfApproval,
+  notifyStudentOfStatus,
+} from "../utils/notificationService.js";
+import {
+  generateApprovalLetter,
+  generateRejectionLetter,
+} from "../utils/pdfGenerator.js";
+
 const router = express.Router();
 
+/* =====================================================
+   MIDDLEWARE
+===================================================== */
 router.use(protect);
-router.use(authorize("teacher", "hod"));
+router.use(authorize("teacher"));
 
-/* =========================
-   GET TEACHER PROFILE
-========================= */
-router.get("/profile", async (req, res) => {
+/* =====================================================
+   HELPER — Get teacher class filter
+===================================================== */
+const buildClassSectionFilter = (classSections = []) => {
+  if (!classSections.length) return [];
+
+  return classSections.map((cs) => {
+    const [cls, section] = cs.split("-");
+    return {
+      "academicInfo.class": cls,
+      "academicInfo.section": section,
+    };
+  });
+};
+
+/* =====================================================
+   GET /api/teacher/dashboard-stats
+===================================================== */
+router.get("/dashboard-stats", async (req, res) => {
   try {
-    const teacher = await User.findById(req.user.id)
-      .select("-password")
-      .populate("departmentId", "name code")
-      .lean();
-
+    const teacher = await User.findById(req.user.id);
     if (!teacher) {
       return res.status(404).json({ message: "Teacher not found" });
     }
 
-    res.json({ success: true, data: teacher });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error", error: err.message });
-  }
-});
-
-/* =========================
-   UPDATE TEACHER PROFILE - FIXED
-========================= */
-router.patch("/profile", async (req, res) => {
-  try {
-    console.log("PATCH BODY RECEIVED:", req.body);
-
-    // 1. Updated Allowed Fields to include Professional Details
-    const allowedFields = [
-      // Personal Info
-      "firstName",
-      "lastName",
-      "email",
-      "phone",
-      "dateOfBirth",
-      "gender",
-      "address",
-      // Professional Info
-      "bio",
-      "qualification",
-      "experience",
-      "specialization",
-    ];
-
-    const updates = {};
-    const bodyKeys = Object.keys(req.body);
-
-    // 2. Determine if we are using dot notation from frontend
-    const hasPrefix = bodyKeys.some(
-      (key) =>
-        key.startsWith("personalInfo.") ||
-        key.startsWith("professionalDetails."),
-    );
-
-    if (hasPrefix) {
-      // Handle dot notation format: { "personalInfo.email": "...", "professionalDetails.bio": "..." }
-      for (const key of bodyKeys) {
-        const parts = key.split(".");
-        const prefix = parts[0]; // personalInfo or professionalDetails
-        const field = parts[1];
-
-        if (
-          (prefix === "personalInfo" || prefix === "professionalDetails") &&
-          allowedFields.includes(field)
-        ) {
-          updates[key] = req.body[key];
-        }
-      }
-    } else {
-      // Handle nested object format: { personalInfo: { email: "..." }, professionalDetails: { bio: "..." } }
-
-      // Personal Info Updates
-      if (req.body.personalInfo) {
-        for (const field of allowedFields) {
-          if (req.body.personalInfo[field] !== undefined) {
-            updates[`personalInfo.${field}`] = req.body.personalInfo[field];
-          }
-        }
-      }
-
-      // Professional Info Updates
-      if (req.body.professionalDetails) {
-        for (const field of allowedFields) {
-          if (req.body.professionalDetails[field] !== undefined) {
-            updates[`professionalDetails.${field}`] =
-              req.body.professionalDetails[field];
-          }
-        }
-      }
-    }
-
-    console.log("FILTERED UPDATES FOR MONGOOSE:", updates);
-
-    if (Object.keys(updates).length === 0) {
-      return res.status(400).json({
-        message: "No valid fields provided for update",
-      });
-    }
-
-    // 3. Perform the update
-    const teacher = await User.findByIdAndUpdate(
-      req.user.id,
-      { $set: updates },
-      { new: true, runValidators: true },
-    )
-      .select("-password")
-      .populate("departmentId", "name code");
-
-    res.json({
-      success: true,
-      message: "Profile updated successfully",
-      data: teacher,
-    });
-  } catch (err) {
-    console.error("Update error:", err);
-    res.status(500).json({ message: "Server error", error: err.message });
-  }
-});
-
-/* =========================
-   GET ASSIGNED STUDENTS
-========================= */
-router.get("/students", async (req, res) => {
-  try {
-    const teacher = await User.findById(req.user.id);
-
-    const query = {
-      role: "student",
-      isActive: true,
-    };
-
-    if (teacher.teachingInfo?.classSections?.length > 0) {
-      const sections = teacher.teachingInfo.classSections;
-
-      const studentAcademics = await StudentAcademic.find({
-        $or: sections.map((sec) => {
-          const [cls, sect] = sec.split("-");
-          return {
-            "academicInfo.class": cls,
-            "academicInfo.section": sect,
-          };
-        }),
-      }).select("userId");
-
-      query._id = { $in: studentAcademics.map((s) => s.userId) };
-    }
-
-    if (
-      teacher.teachingInfo?.isClassTeacher &&
-      teacher.teachingInfo?.classSections?.[0]
-    ) {
-      const [cls, sect] = teacher.teachingInfo.classSections[0].split("-");
-
-      const studentAcademics = await StudentAcademic.find({
-        "academicInfo.class": cls,
-        "academicInfo.section": sect,
-      }).select("userId");
-
-      query._id = { $in: studentAcademics.map((s) => s.userId) };
-    }
-
-    const students = await User.find(query)
-      .select("-password")
-      .populate("departmentId", "name code")
-      .lean();
-
-    const studentsWithAcademics = await Promise.all(
-      students.map(async (student) => {
-        const academic = await StudentAcademic.findOne({
-          userId: student._id,
-        }).lean();
-
-        return {
-          ...student,
-          academicInfo: academic?.academicInfo || null,
-        };
-      }),
-    );
-
-    res.json({
-      success: true,
-      count: studentsWithAcademics.length,
-      data: studentsWithAcademics,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error", error: err.message });
-  }
-});
-
-/* =========================
-   GET PENDING LEAVES
-========================= */
-router.get("/leaves/pending", async (req, res) => {
-  try {
-    const teacher = await User.findById(req.user.id);
-
-    const query = {
-      status: "pending_teacher",
-      teacherId: req.user.id,
-    };
-
-    if (teacher.teachingInfo?.isClassTeacher) {
-      const classSection = teacher.teachingInfo.classSections?.[0];
-      if (classSection) {
-        const [cls, sect] = classSection.split("-");
-
-        const students = await StudentAcademic.find({
-          "academicInfo.class": cls,
-          "academicInfo.section": sect,
-        }).select("userId");
-
-        query.$or = [
-          { teacherId: req.user.id },
-          { studentId: { $in: students.map((s) => s.userId) } },
-        ];
-      }
-    }
-
-    const leaves = await Leave.find(query)
-      .populate("studentId", "userId personalInfo role")
-      .sort({ createdAt: -1 });
-
-    res.json({
-      success: true,
-      count: leaves.length,
-      data: leaves,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error", error: err.message });
-  }
-});
-
-/* =========================
-   GET STUDENT DETAILS
-========================= */
-router.get("/students/:id", async (req, res) => {
-  try {
-    const student = await User.findOne({
-      _id: req.params.id,
-      role: "student",
-    })
-      .select("-password")
-      .populate("departmentId", "name code")
-      .lean();
-
-    if (!student) {
-      return res.status(404).json({ message: "Student not found" });
-    }
-
-    const academic = await StudentAcademic.findOne({
-      userId: student._id,
-    }).lean();
-
-    const leaves = await Leave.find({ studentId: student._id })
-      .sort({ createdAt: -1 })
-      .limit(10);
-
-    res.json({
-      success: true,
-      data: {
-        ...student,
-        academicInfo: academic?.academicInfo || null,
-        leaveHistory: leaves,
-      },
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error", error: err.message });
-  }
-});
-
-/* =========================
-   DASHBOARD STATS
-========================= */
-router.get("/dashboard-stats", async (req, res) => {
-  try {
-    const teacher = await User.findById(req.user.id);
+    const isClassTeacher = teacher.teachingInfo?.isClassTeacher || false;
+    const classSections = teacher.teachingInfo?.classSections || [];
 
     let totalStudents = 0;
-    let pendingLeaves = 0;
-    let todayAbsents = 0;
+    let studentIds = [];
 
-    if (teacher.teachingInfo?.classSections?.length > 0) {
-      const sections = teacher.teachingInfo.classSections;
+    if (classSections.length > 0) {
+      const classFilter = buildClassSectionFilter(classSections);
 
-      totalStudents = await StudentAcademic.countDocuments({
-        $or: sections.map((sec) => {
-          const [cls, sect] = sec.split("-");
-          return {
-            "academicInfo.class": cls,
-            "academicInfo.section": sect,
-          };
-        }),
-      });
+      studentIds = await StudentAcademic.find({ $or: classFilter }).distinct(
+        "userId",
+      );
 
-      pendingLeaves = await Leave.countDocuments({
-        status: "pending_teacher",
-        teacherId: req.user.id,
-      });
-
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      todayAbsents = await Leave.countDocuments({
-        status: "approved_by_teacher",
-        fromDate: { $lte: today },
-        toDate: { $gte: today },
-      });
+      totalStudents = studentIds.length;
     }
+
+    const pendingLeaves = studentIds.length
+      ? await LeaveRequest.countDocuments({
+          applicantId: { $in: studentIds },
+          status: "pending",
+          currentLevel: 1,
+        })
+      : 0;
 
     res.json({
       success: true,
       data: {
         totalStudents,
         pendingLeaves,
-        todayAbsents,
-        assignedClasses: teacher.teachingInfo?.classSections || [],
+        isClassTeacher,
+        assignedClasses: classSections,
         subjects: teacher.teachingInfo?.subjects || [],
-        isClassTeacher: teacher.teachingInfo?.isClassTeacher || false,
       },
     });
   } catch (err) {
-    console.error(err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 });
-/* =========================
-   UPLOAD PROFILE PHOTO
-========================= */
-router.post(
-  "/profile/upload-photo",
-  upload.single("profilePicture"), // Ensure this matches formData.append()
-  async (req, res) => {
-    try {
-      // --- DEBUGGING LOG ---
-      console.log("Multer file received:", req.file);
-      console.log("Request body:", req.body);
-      // ---------------------
 
-      if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
-      }
-
-      const teacher = await User.findById(req.user.id);
-
-      // Delete old photo if it exists
-      if (teacher.personalInfo?.profilePicture) {
-        const oldPhotoPath = path.join(
-          process.cwd(),
-          teacher.personalInfo.profilePicture,
-        );
-        if (fs.existsSync(oldPhotoPath)) {
-          fs.unlinkSync(oldPhotoPath);
-        }
-      }
-
-      // Save new photo path
-      // Using relative path for URL access, adjust based on your static folder config
-      const photoPath = `/uploads/${req.file.filename}`;
-      teacher.personalInfo.profilePicture = photoPath;
-      await teacher.save();
-
-      res.json({
-        success: true,
-        message: "Photo uploaded successfully",
-        data: teacher,
-      });
-    } catch (err) {
-      console.error("Upload error:", err);
-      res.status(500).json({ message: "Server error", error: err.message });
+/* =====================================================
+   GET /api/teacher/leaves/pending
+===================================================== */
+router.get("/leaves/pending", async (req, res) => {
+  try {
+    const teacher = await User.findById(req.user.id);
+    if (!teacher) {
+      return res.status(404).json({ message: "Teacher not found" });
     }
-  },
-);
+
+    const classSections = teacher.teachingInfo?.classSections || [];
+    const classFilter = buildClassSectionFilter(classSections);
+
+    if (!classFilter.length) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const students = await StudentAcademic.find({ $or: classFilter }).distinct(
+      "userId",
+    );
+
+    const leaves = await LeaveRequest.find({
+      applicantId: { $in: students },
+      status: "pending",
+      currentLevel: 1,
+    })
+      .populate(
+        "applicantId",
+        "personalInfo.firstName personalInfo.lastName userId",
+      )
+      .populate("leaveType", "name")
+      .sort({ createdAt: -1 });
+
+    res.json({ success: true, data: leaves });
+  } catch (err) {
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
+/* =====================================================
+   GET /api/teacher/leaves/history
+===================================================== */
+router.get("/leaves/history", async (req, res) => {
+  try {
+    const teacher = await User.findById(req.user.id);
+    const classSections = teacher.teachingInfo?.classSections || [];
+    const classFilter = buildClassSectionFilter(classSections);
+
+    if (!classFilter.length) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const students = await StudentAcademic.find({ $or: classFilter }).distinct(
+      "userId",
+    );
+
+    const leaves = await LeaveRequest.find({
+      applicantId: { $in: students },
+      status: { $ne: "pending" },
+    })
+      .populate(
+        "applicantId",
+        "personalInfo.firstName personalInfo.lastName userId",
+      )
+      .populate("leaveType", "name")
+      .sort({ createdAt: -1 });
+
+    res.json({ success: true, data: leaves });
+  } catch (err) {
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
+/* =====================================================
+   GET /api/teacher/leaves/:leaveId
+===================================================== */
+router.get("/leaves/:leaveId", async (req, res) => {
+  try {
+    const leave = await LeaveRequest.findById(req.params.leaveId)
+      .populate(
+        "applicantId",
+        "personalInfo.firstName personalInfo.lastName userId",
+      )
+      .populate("leaveType", "name");
+
+    if (!leave) {
+      return res.status(404).json({ message: "Leave request not found" });
+    }
+
+    res.json({ success: true, data: leave });
+  } catch (err) {
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
+/* =====================================================
+   POST /api/teacher/leaves/:leaveId/approve
+===================================================== */
+router.post("/leaves/:leaveId/approve", async (req, res) => {
+  try {
+    const { remarks } = req.body;
+
+    const leave = await LeaveRequest.findById(req.params.leaveId)
+      .populate("applicantId", "personalInfo userId")
+      .populate("leaveType", "name");
+
+    if (!leave) {
+      return res.status(404).json({ message: "Leave request not found" });
+    }
+
+    if (leave.currentLevel !== 1) {
+      return res
+        .status(400)
+        .json({ message: "Not authorized for this approval level" });
+    }
+
+    const teacher = await User.findById(req.user.id);
+
+    // record approval
+    leave.approvals.push({
+      level: 1,
+      approverId: req.user.id,
+      status: "approved",
+      remarks: remarks || "Approved by class teacher",
+      approvedAt: new Date(),
+    });
+
+    leave.status = "approved_by_teacher";
+    leave.currentLevel = 2;
+
+    // optional approval letter
+    try {
+      const letter = await generateApprovalLetter(leave, teacher);
+      if (letter?.url) {
+        leave.approvalLetter = {
+          url: letter.url,
+          generatedAt: new Date(),
+          generatedBy: req.user.id,
+        };
+      }
+    } catch (e) {
+      console.error("Approval letter generation failed:", e.message);
+    }
+
+    await leave.save();
+
+    await notifyHODOfApproval(leave);
+
+    res.json({
+      success: true,
+      message: "Leave approved and forwarded to HOD",
+      data: leave,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
+/* =====================================================
+   POST /api/teacher/leaves/:leaveId/reject
+===================================================== */
+router.post("/leaves/:leaveId/reject", async (req, res) => {
+  try {
+    const { reason } = req.body;
+
+    const leave = await LeaveRequest.findById(req.params.leaveId).populate(
+      "applicantId",
+      "personalInfo userId",
+    );
+
+    if (!leave) {
+      return res.status(404).json({ message: "Leave request not found" });
+    }
+
+    if (leave.currentLevel !== 1) {
+      return res
+        .status(400)
+        .json({ message: "Not authorized for this rejection level" });
+    }
+
+    const teacher = await User.findById(req.user.id);
+
+    const letter = await generateRejectionLetter(
+      leave,
+      teacher,
+      reason || "Rejected by class teacher",
+    );
+
+    leave.approvals.push({
+      level: 1,
+      approverId: req.user.id,
+      status: "rejected",
+      remarks: reason,
+      rejectedAt: new Date(),
+    });
+
+    leave.status = "rejected";
+    leave.finalStatus = "rejected";
+    leave.currentLevel = 0;
+
+    if (letter?.url) {
+      leave.rejectionLetter = {
+        url: letter.url,
+        generatedAt: new Date(),
+        generatedBy: req.user.id,
+        reason: reason,
+      };
+    }
+
+    await leave.save();
+
+    await notifyStudentOfStatus(
+      leave,
+      "rejected",
+      `${teacher.personalInfo.firstName} ${teacher.personalInfo.lastName}`,
+    );
+
+    res.json({
+      success: true,
+      message: "Leave rejected",
+      data: leave,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
+// GET /api/teacher/profile
+router.get("/profile", async (req, res) => {
+  try {
+    const teacher = await User.findById(req.user.id).select("-password");
+
+    if (!teacher) {
+      return res.status(404).json({ message: "Teacher not found" });
+    }
+
+    res.json({
+      success: true,
+      data: teacher,
+    });
+  } catch (err) {
+    res.status(500).json({
+      message: "Server error",
+      error: err.message,
+    });
+  }
+});
+
+// GET /api/teacher/students
+router.get("/students", async (req, res) => {
+  try {
+    const teacher = await User.findById(req.user.id);
+
+    if (!teacher) {
+      return res.status(404).json({ message: "Teacher not found" });
+    }
+
+    if (!teacher.departmentId) {
+      return res.json({ success: true, data: [] });
+    }
+
+    // 1️⃣ get all student users in same department
+    const studentUsers = await User.find({
+      role: "student",
+      departmentId: teacher.departmentId,
+      isActive: true,
+    }).select("_id userId personalInfo");
+
+    const userIds = studentUsers.map((u) => u._id);
+
+    // 2️⃣ get academic records
+    const academics = await StudentAcademic.find({
+      userId: { $in: userIds },
+    }).lean();
+
+    const academicMap = new Map();
+    academics.forEach((a) => {
+      academicMap.set(String(a.userId), a.academicInfo);
+    });
+
+    // 3️⃣ merge
+    const students = studentUsers.map((u) => ({
+      _id: u._id,
+      userId: u.userId,
+      personalInfo: u.personalInfo,
+      academicInfo: academicMap.get(String(u._id)) || {},
+    }));
+
+    // 4️⃣ sort by section + roll
+    students.sort((a, b) => {
+      const s1 = a.academicInfo.section || "";
+      const s2 = b.academicInfo.section || "";
+      if (s1 !== s2) return s1.localeCompare(s2);
+
+      return (
+        (a.academicInfo.rollNumber || 0) - (b.academicInfo.rollNumber || 0)
+      );
+    });
+
+    res.json({
+      success: true,
+      count: students.length,
+      data: students,
+    });
+  } catch (err) {
+    console.error("Teacher students error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to load students",
+    });
+  }
+});
+
+/* ================================
+   GET SINGLE STUDENT DETAILS
+================================ */
+router.get("/students/:id", protect, authorize("teacher"), async (req, res) => {
+  try {
+    const student = await User.findOne({
+      _id: req.params.id,
+      role: "student",
+    }).select("-password");
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found",
+      });
+    }
+
+    const academic = await StudentAcademic.findOne({
+      userId: student._id,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        ...student.toObject(),
+        academicInfo: academic?.academicInfo || null,
+      },
+    });
+  } catch (error) {
+    console.error("Get student detail error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch student details",
+    });
+  }
+});
+
 export default router;

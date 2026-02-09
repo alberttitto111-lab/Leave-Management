@@ -25,14 +25,61 @@ import HODDashboard from "../screens/HOD/HODDashboard";
 import TeacherDashboard from "../screens/teacher/TeacherDashboard";
 import TeacherProfile from "../screens/teacher/TeacherProfile";
 import StudentList from "../screens/teacher/StudentList";
+import StudentDetail from "../screens/teacher/StudentDetail";
+import TeacherLeaveRequestsScreen from "../screens/teacher/TeacherLeaveRequestsScreen";
 
 // Student Screens
-import StudentDashboard from "../screens/dashboard/StudentDashboard";
+import StudentDashboard from "../screens/student/StudentDashboard";
+import LeaveHistoryScreen from "../screens/student/LeaveHistoryScreen";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
+const StudentStack = createStackNavigator();
+
+/* -------------------- STUDENT STACK NAVIGATOR -------------------- */
+
+const StudentStackNavigator = () => (
+  <StudentStack.Navigator screenOptions={{ headerShown: false }}>
+    <StudentStack.Screen name="StudentHome" component={StudentDashboard} />
+    <StudentStack.Screen
+      name="LeaveHistory"
+      component={LeaveHistoryScreen}
+      options={{
+        headerShown: true,
+        title: "Leave History",
+        headerStyle: { backgroundColor: "#2563EB" },
+        headerTintColor: "#fff",
+      }}
+    />
+  </StudentStack.Navigator>
+);
 
 /* -------------------- ROLE TAB NAVIGATORS -------------------- */
+
+const StudentTabs = () => (
+  <Tab.Navigator
+    screenOptions={({ route }) => ({
+      tabBarIcon: ({ focused, color, size }) => {
+        let iconName;
+        if (route.name === "Home") iconName = focused ? "home" : "home-outline";
+        else if (route.name === "Apply")
+          iconName = focused ? "add-circle" : "add-circle-outline";
+        else if (route.name === "History")
+          iconName = focused ? "time" : "time-outline";
+        else if (route.name === "Profile")
+          iconName = focused ? "person" : "person-outline";
+        return <Ionicons name={iconName} size={size} color={color} />;
+      },
+      tabBarActiveTintColor: "#2563EB",
+      tabBarInactiveTintColor: "gray",
+    })}
+  >
+    <Tab.Screen name="Home" component={StudentStackNavigator} />
+    <Tab.Screen name="Apply" component={StudentDashboard} />
+    <Tab.Screen name="History" component={LeaveHistoryScreen} />
+    <Tab.Screen name="Profile" component={StudentDashboard} />
+  </Tab.Navigator>
+);
 
 const AdminTabs = () => (
   <Tab.Navigator
@@ -103,32 +150,6 @@ const TeacherTabs = () => (
     <Tab.Screen name="Dashboard" component={TeacherDashboard} />
     <Tab.Screen name="My Class" component={StudentList} />
     <Tab.Screen name="Approvals" component={TeacherDashboard} />
-  </Tab.Navigator>
-);
-
-const StudentTabs = () => (
-  <Tab.Navigator
-    screenOptions={({ route }) => ({
-      tabBarIcon: ({ focused, color, size }) => {
-        let iconName;
-        if (route.name === "Dashboard")
-          iconName = focused ? "home" : "home-outline";
-        else if (route.name === "Leaves")
-          iconName = focused ? "calendar" : "calendar-outline";
-        else if (route.name === "History")
-          iconName = focused ? "time" : "time-outline";
-        else if (route.name === "Profile")
-          iconName = focused ? "person" : "person-outline";
-        return <Ionicons name={iconName} size={size} color={color} />;
-      },
-      tabBarActiveTintColor: "#2563EB",
-      tabBarInactiveTintColor: "gray",
-    })}
-  >
-    <Tab.Screen name="Dashboard" component={StudentDashboard} />
-    <Tab.Screen name="Leaves" component={StudentDashboard} />
-    <Tab.Screen name="History" component={StudentDashboard} />
-    <Tab.Screen name="Profile" component={StudentDashboard} />
   </Tab.Navigator>
 );
 
@@ -232,6 +253,26 @@ const AppNavigator = () => {
                 options={{
                   headerShown: true,
                   title: "My Students",
+                  headerStyle: { backgroundColor: "#0D9488" },
+                  headerTintColor: "#fff",
+                }}
+              />
+              <Stack.Screen
+                name="StudentDetail"
+                component={StudentDetail}
+                options={{
+                  headerShown: true,
+                  title: "Student Details",
+                  headerStyle: { backgroundColor: "#0D9488" },
+                  headerTintColor: "#fff",
+                }}
+              />
+              <Stack.Screen
+                name="TeacherLeaveRequests"
+                component={TeacherLeaveRequestsScreen}
+                options={{
+                  headerShown: true,
+                  title: "Leave Requests",
                   headerStyle: { backgroundColor: "#0D9488" },
                   headerTintColor: "#fff",
                 }}
