@@ -12,7 +12,8 @@ const router = express.Router();
 router.use(protect);
 router.use(authorize("student"));
 
-// GET /api/student/dashboard-stats
+/* ================= DASHBOARD STATS ================= */
+
 router.get("/dashboard-stats", async (req, res) => {
   try {
     const student = await User.findById(req.user.id);
@@ -20,7 +21,6 @@ router.get("/dashboard-stats", async (req, res) => {
 
     const pendingLeaves = await LeaveRequest.countDocuments({
       applicantId: req.user.id,
-      status: { $in: ["pending", "approved_by_teacher"] },
       finalStatus: "pending",
     });
 
@@ -29,10 +29,12 @@ router.get("/dashboard-stats", async (req, res) => {
       finalStatus: "approved",
     });
 
-    const recentLeaves = await LeaveRequest.find({ applicantId: req.user.id })
+    const recentLeaves = await LeaveRequest.find({
+      applicantId: req.user.id,
+    })
       .sort({ createdAt: -1 })
       .limit(3)
-      .populate("leaveType", "name")
+      .populate("leaveType", "name color")
       .populate(
         "approvals.approverId",
         "personalInfo.firstName personalInfo.lastName role",
@@ -41,7 +43,9 @@ router.get("/dashboard-stats", async (req, res) => {
     res.json({
       success: true,
       data: {
-        studentName: `${student.personalInfo.firstName} ${student.personalInfo.lastName}`,
+        studentName: student?.personalInfo
+          ? `${student.personalInfo.firstName} ${student.personalInfo.lastName}`
+          : "Student",
         class: academic?.academicInfo?.class || "N/A",
         section: academic?.academicInfo?.section || "N/A",
         rollNumber: academic?.academicInfo?.rollNumber || "N/A",
@@ -52,16 +56,21 @@ router.get("/dashboard-stats", async (req, res) => {
     });
   } catch (err) {
     console.error("Dashboard stats error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Server error", error: err.message });
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: err.message,
+    });
   }
 });
 
-// GET /api/student/leave-history
+/* ================= LEAVE HISTORY ================= */
+
 router.get("/leave-history", async (req, res) => {
   try {
-    const leaves = await LeaveRequest.find({ applicantId: req.user.id })
+    const leaves = await LeaveRequest.find({
+      applicantId: req.user.id,
+    })
       .sort({ createdAt: -1 })
       .populate("leaveType", "name color")
       .populate(
@@ -76,24 +85,24 @@ router.get("/leave-history", async (req, res) => {
     });
   } catch (err) {
     console.error("Leave history error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Server error", error: err.message });
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: err.message,
+    });
   }
 });
 
-// GET /api/student/leave-types - FILTERED FOR STUDENTS
+/* ================= LEAVE TYPES ================= */
+
 router.get("/leave-types", async (req, res) => {
   try {
-    // Filter for leave types applicable to students or all
     const types = await LeaveType.find({
       isActive: true,
       $or: [{ applicableTo: "student" }, { applicableTo: "all" }],
     }).select(
       "name code color maxDaysPerYear maxDaysPerMonth requiresDocument approvalHierarchy applicableTo isActive",
     );
-
-    console.log(`Found ${types.length} leave types for student ${req.user.id}`);
 
     res.json({
       success: true,
@@ -102,36 +111,35 @@ router.get("/leave-types", async (req, res) => {
     });
   } catch (err) {
     console.error("Leave types fetch error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Server error", error: err.message });
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: err.message,
+    });
   }
 });
 
-// POST /api/student/leave-request - WITH VALIDATION
+/* ================= CREATE LEAVE ================= */
+
 router.post("/leave-request", async (req, res) => {
   try {
     const { leaveTypeId, fromDate, toDate, reason, halfDay, halfDayType } =
       req.body;
 
-    // Validate required fields
     if (!leaveTypeId || !fromDate || !toDate || !reason) {
       return res.status(400).json({
         success: false,
-        message:
-          "Please provide all required fields: leaveTypeId, fromDate, toDate, reason",
+        message: "Please provide leaveTypeId, fromDate, toDate, reason",
       });
     }
 
-    // Validate leaveTypeId format
     if (!mongoose.Types.ObjectId.isValid(leaveTypeId)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid leave type ID format",
+        message: "Invalid leave type ID",
       });
     }
 
-    // Check if leave type exists and is applicable to students
     const leaveType = await LeaveType.findOne({
       _id: leaveTypeId,
       isActive: true,
@@ -141,50 +149,39 @@ router.post("/leave-request", async (req, res) => {
     if (!leaveType) {
       return res.status(400).json({
         success: false,
-        message: "Invalid or unauthorized leave type for students",
+        message: "Leave type not allowed",
       });
     }
 
-    const student = await User.findById(req.user.id);
-    const academic = await StudentAcademic.findOne({ userId: req.user.id });
-
-    // Parse and validate dates
     const start = new Date(fromDate);
     const end = new Date(toDate);
 
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    if (isNaN(start) || isNaN(end) || end < start) {
       return res.status(400).json({
         success: false,
-        message: "Invalid date format",
+        message: "Invalid date range",
       });
     }
 
-    if (end < start) {
-      return res.status(400).json({
-        success: false,
-        message: "End date cannot be before start date",
-      });
-    }
-
-    // Calculate days
-    const timeDiff = Math.abs(end - start);
-    let days = Math.ceil(timeDiff / (1000 * 60 * 60 * 24)) + 1;
+    let days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
     if (halfDay) days = 0.5;
 
-    // Optional: Check if student exceeds max days limit
-    if (leaveType.maxDaysPerYear > 0) {
-      const currentYear = new Date().getFullYear();
-      const yearStart = new Date(currentYear, 0, 1);
-      const yearEnd = new Date(currentYear, 11, 31);
+    /* ===== YEAR LIMIT CHECK ===== */
 
-      const usedLeaves = await LeaveRequest.aggregate([
+    if (leaveType.maxDaysPerYear > 0) {
+      const y = new Date().getFullYear();
+
+      const used = await LeaveRequest.aggregate([
         {
           $match: {
             applicantId: new mongoose.Types.ObjectId(req.user.id),
             leaveType: new mongoose.Types.ObjectId(leaveTypeId),
             finalStatus: "approved",
-            "dateRange.from": { $gte: yearStart, $lte: yearEnd },
+            "dateRange.from": {
+              $gte: new Date(y, 0, 1),
+              $lte: new Date(y, 11, 31),
+            },
           },
         },
         {
@@ -195,16 +192,16 @@ router.post("/leave-request", async (req, res) => {
         },
       ]);
 
-      const usedDays = usedLeaves[0]?.totalDays || 0;
+      const usedDays = used[0]?.totalDays || 0;
+
       if (usedDays + days > leaveType.maxDaysPerYear) {
         return res.status(400).json({
           success: false,
-          message: `You have exceeded the maximum ${leaveType.maxDaysPerYear} days per year for ${leaveType.name}. Used: ${usedDays}, Requesting: ${days}`,
+          message: `Yearly limit exceeded. Used ${usedDays}/${leaveType.maxDaysPerYear}`,
         });
       }
     }
 
-    // Create Leave Request
     const leaveRequest = new LeaveRequest({
       requestId: `LR-${Date.now()}`,
       applicantId: req.user.id,
@@ -213,8 +210,8 @@ router.post("/leave-request", async (req, res) => {
       dateRange: {
         from: start,
         to: end,
-        days: days,
-        halfDay: halfDay || false,
+        days,
+        halfDay: !!halfDay,
         halfDayType: halfDayType || null,
       },
       reason,
@@ -227,37 +224,35 @@ router.post("/leave-request", async (req, res) => {
     await leaveRequest.save();
     await leaveRequest.populate("leaveType");
 
-    // Notify class teacher immediately
     try {
       await notifyTeacherOfNewLeave(leaveRequest);
-    } catch (notifyErr) {
-      console.error("Failed to notify teacher:", notifyErr);
-      // Don't fail the request if notification fails
+    } catch (e) {
+      console.error("Teacher notify failed:", e.message);
     }
 
     res.status(201).json({
       success: true,
-      message: "Leave request submitted successfully",
+      message: "Leave request submitted",
       data: leaveRequest,
     });
   } catch (err) {
-    console.error("Leave request creation error:", err);
+    console.error("Leave create error:", err);
     res.status(500).json({
       success: false,
-      message: "Server error",
-      error: err.message,
+      message: err.message,
     });
   }
 });
 
-// GET /api/student/download-letter/:leaveId
+/* ================= DOWNLOAD LETTER ================= */
+
 router.get("/download-letter/:leaveId", async (req, res) => {
   try {
-    // Validate leaveId format
     if (!mongoose.Types.ObjectId.isValid(req.params.leaveId)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid leave ID format" });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid leave ID",
+      });
     }
 
     const leave = await LeaveRequest.findOne({
@@ -266,47 +261,62 @@ router.get("/download-letter/:leaveId", async (req, res) => {
     });
 
     if (!leave) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Leave request not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Leave not found",
+      });
     }
 
-    if (leave.finalStatus === "approved" && leave.approvalLetter?.url) {
+    // supports BOTH string and object formats
+    const approvalUrl =
+      typeof leave.approvalLetter === "string"
+        ? leave.approvalLetter
+        : leave.approvalLetter?.url;
+
+    const rejectionUrl =
+      typeof leave.rejectionLetter === "string"
+        ? leave.rejectionLetter
+        : leave.rejectionLetter?.url;
+
+    if (leave.finalStatus === "approved" && approvalUrl) {
       return res.json({
         success: true,
-        url: leave.approvalLetter.url,
+        url: approvalUrl,
         type: "approval",
       });
     }
 
-    if (leave.finalStatus === "rejected" && leave.rejectionLetter?.url) {
+    if (leave.finalStatus === "rejected" && rejectionUrl) {
       return res.json({
         success: true,
-        url: leave.rejectionLetter.url,
+        url: rejectionUrl,
         type: "rejection",
       });
     }
 
-    res
-      .status(404)
-      .json({ success: false, message: "Letter not available yet" });
+    res.status(404).json({
+      success: false,
+      message: "Letter not available yet",
+    });
   } catch (err) {
     console.error("Download letter error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Server error", error: err.message });
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 });
-// DELETE /api/student/leave/:id - DELETE LEAVE REQUEST
+
+/* ================= DELETE LEAVE ================= */
+
 router.delete("/leave/:id", async (req, res) => {
   try {
     const leaveId = req.params.id;
 
-    // Validate ID format
     if (!mongoose.Types.ObjectId.isValid(leaveId)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid leave ID format",
+        message: "Invalid leave ID",
       });
     }
 
@@ -319,67 +329,69 @@ router.delete("/leave/:id", async (req, res) => {
       });
     }
 
-    // Check ownership
     if (leave.applicantId.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
-        message: "Not allowed to delete this leave",
+        message: "Not allowed",
       });
     }
 
-    // Only allow deletion if still pending
     if (leave.finalStatus !== "pending") {
       return res.status(400).json({
         success: false,
-        message: "Cannot delete leave that is already approved or rejected",
+        message: "Cannot delete processed leave",
       });
     }
 
     await LeaveRequest.findByIdAndDelete(leaveId);
 
-    return res.json({
+    res.json({
       success: true,
-      message: "Leave deleted successfully",
+      message: "Leave deleted",
     });
   } catch (err) {
     console.error("Delete leave error:", err);
     res.status(500).json({
       success: false,
-      message: "Server error",
-      error: err.message,
+      message: err.message,
     });
   }
 });
 
-// GET /api/student/leave-balance/:leaveTypeId - Get remaining balance for a leave type
+/* ================= LEAVE BALANCE ================= */
+
 router.get("/leave-balance/:leaveTypeId", async (req, res) => {
   try {
     const { leaveTypeId } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(leaveTypeId)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid leave type ID" });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid leave type ID",
+      });
     }
 
     const leaveType = await LeaveType.findById(leaveTypeId);
+
     if (!leaveType) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Leave type not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Leave type not found",
+      });
     }
 
-    const currentYear = new Date().getFullYear();
-    const yearStart = new Date(currentYear, 0, 1);
-    const yearEnd = new Date(currentYear, 11, 31);
+    const y = new Date().getFullYear();
 
-    const usedLeaves = await LeaveRequest.aggregate([
+    const used = await LeaveRequest.aggregate([
       {
         $match: {
           applicantId: new mongoose.Types.ObjectId(req.user.id),
           leaveType: new mongoose.Types.ObjectId(leaveTypeId),
           finalStatus: "approved",
-          "dateRange.from": { $gte: yearStart, $lte: yearEnd },
+          "dateRange.from": {
+            $gte: new Date(y, 0, 1),
+            $lte: new Date(y, 11, 31),
+          },
         },
       },
       {
@@ -390,25 +402,27 @@ router.get("/leave-balance/:leaveTypeId", async (req, res) => {
       },
     ]);
 
-    const usedDays = usedLeaves[0]?.totalDays || 0;
-    const totalAllowed = leaveType.maxDaysPerYear;
-    const remaining = totalAllowed > 0 ? totalAllowed - usedDays : "Unlimited";
+    const usedDays = used[0]?.totalDays || 0;
 
     res.json({
       success: true,
       data: {
         leaveType: leaveType.name,
-        totalAllowed,
+        totalAllowed: leaveType.maxDaysPerYear,
         usedDays,
-        remaining,
+        remaining:
+          leaveType.maxDaysPerYear > 0
+            ? leaveType.maxDaysPerYear - usedDays
+            : "Unlimited",
         unit: "days",
       },
     });
   } catch (err) {
     console.error("Leave balance error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Server error", error: err.message });
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 });
 

@@ -21,6 +21,9 @@ import LeaveTypesManagementScreen from "../screens/admin/LeaveTypesManagementScr
 
 // HOD Screens
 import HODDashboard from "../screens/HOD/HODDashboard";
+import HodLeaveApprovals from "../screens/HOD/HodLeaveApprovals";
+import DepartmentTeachers from "../screens/HOD/DepartmentTeachers";
+import DepartmentStudents from "../screens/HOD/DepartmentStudents";
 
 // Teacher Screens
 import TeacherDashboard from "../screens/teacher/TeacherDashboard";
@@ -114,12 +117,14 @@ const HODTabs = () => (
     screenOptions={({ route }) => ({
       tabBarIcon: ({ focused, color, size }) => {
         let iconName;
+
         if (route.name === "Dashboard")
           iconName = focused ? "home" : "home-outline";
         else if (route.name === "Approvals")
           iconName = focused ? "checkmark-circle" : "checkmark-circle-outline";
         else if (route.name === "Reports")
           iconName = focused ? "bar-chart" : "bar-chart-outline";
+
         return <Ionicons name={iconName} size={size} color={color} />;
       },
       tabBarActiveTintColor: "#4338CA",
@@ -127,7 +132,13 @@ const HODTabs = () => (
     })}
   >
     <Tab.Screen name="Dashboard" component={HODDashboard} />
-    <Tab.Screen name="Approvals" component={HODDashboard} />
+
+    <Tab.Screen
+      name="Approvals"
+      component={HodLeaveApprovals}
+      options={{ headerShown: false }}
+    />
+
     <Tab.Screen name="Reports" component={HODDashboard} />
   </Tab.Navigator>
 );
@@ -241,7 +252,23 @@ const AppNavigator = () => {
           )}
 
           {user?.role === USER_ROLES.HOD && (
-            <Stack.Screen name="HODMain" component={HODTabs} />
+            <>
+              <Stack.Screen name="HODMain" component={HODTabs} />
+
+              <Stack.Screen
+                name="HodLeaveApprovals"
+                component={HodLeaveApprovals}
+                options={{ title: "Leave Approvals" }}
+              />
+              <Stack.Screen
+                name="DepartmentTeachers"
+                component={DepartmentTeachers}
+              />
+              <Stack.Screen
+                name="DepartmentStudents"
+                component={DepartmentStudents}
+              />
+            </>
           )}
 
           {user?.role === USER_ROLES.TEACHER && (

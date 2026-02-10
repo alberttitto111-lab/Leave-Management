@@ -1,9 +1,8 @@
 import express from "express";
+import { getHodAnalytics } from "../controllers/hodController.js";
+import { protect } from "../middleware/auth.js";
 import LeaveRequest from "../models/LeaveRequest.js";
 import User from "../models/User.js";
-import StudentAcademic from "../models/StudentAcademic.js";
-import { protect, authorize } from "../middleware/auth.js";
-import { notifyStudentOfStatus } from "../utils/notificationService.js";
 import {
   generateApprovalLetter,
   generateRejectionLetter,
@@ -11,210 +10,219 @@ import {
 
 const router = express.Router();
 
-router.use(protect);
-router.use(authorize("hod"));
+/* ================= ROLE GUARD ================= */
 
-// GET /api/hod/dashboard/stats
-router.get("/dashboard/stats", async (req, res) => {
-  try {
-    const hod = await User.findById(req.user.id);
-    const managedDepts = hod.hodInfo?.managedDepartments || [];
-
-    // Get teachers in department
-    const deptTeachers = await User.countDocuments({
-      role: "teacher",
-      departmentId: { $in: managedDepts },
+const onlyHod = (req, res, next) => {
+  if (!req.user || req.user.role !== "hod") {
+    return res.status(403).json({
+      success: false,
+      message: "Only HOD allowed",
     });
-
-    // Get students in department
-    const students = await StudentAcademic.countDocuments({
-      departmentId: { $in: managedDepts },
-    });
-
-    // Pending approvals for HOD (level 2)
-    const pendingApprovals = await LeaveRequest.countDocuments({
-      status: "approved_by_teacher",
-      currentLevel: 2,
-      finalStatus: "pending",
-    });
-
-    // Calculate leave percentage
-    const totalLeaves = await LeaveRequest.countDocuments({
-      applicantId: {
-        $in: await StudentAcademic.find({
-          departmentId: { $in: managedDepts },
-        }).distinct("userId"),
-      },
-    });
-    const approvedLeaves = await LeaveRequest.countDocuments({
-      applicantId: {
-        $in: await StudentAcademic.find({
-          departmentId: { $in: managedDepts },
-        }).distinct("userId"),
-      },
-      finalStatus: "approved",
-    });
-    const leavePercentage =
-      totalLeaves > 0 ? Math.round((approvedLeaves / totalLeaves) * 100) : 0;
-
-    res.json({
-      success: true,
-      data: {
-        deptTeachers,
-        pendingApprovals,
-        students,
-        leavePercentage,
-      },
-    });
-  } catch (err) {
-    res.status(500).json({ message: "Server error", error: err.message });
   }
-});
+  next();
+};
 
-// GET /api/hod/dashboard/pending-approvals
-router.get("/dashboard/pending-approvals", async (req, res) => {
+/* ================= ANALYTICS ================= */
+
+router.get("/analytics", protect, onlyHod, getHodAnalytics);
+
+/* ================= PENDING LEAVES ================= */
+
+router.get("/pending-leaves", protect, onlyHod, async (req, res) => {
   try {
     const leaves = await LeaveRequest.find({
       status: "approved_by_teacher",
-      currentLevel: 2,
       finalStatus: "pending",
+      currentLevel: 2,
     })
-      .populate(
-        "applicantId",
-        "personalInfo.firstName personalInfo.lastName userId",
-      )
-      .populate("leaveType", "name")
-      .populate(
-        "approvals.approverId",
-        "personalInfo.firstName personalInfo.lastName",
-      )
+      .populate("applicantId")
+      .populate("leaveType")
+      .populate("departmentId")
       .sort({ createdAt: -1 });
 
-    const formatted = leaves.map((leave) => ({
-      _id: leave._id,
-      name: `${leave.applicantId.personalInfo.firstName} ${leave.applicantId.personalInfo.lastName}`,
-      type: leave.leaveType.name,
-      typeCode: leave.leaveType.name.toUpperCase().includes("MEDICAL")
-        ? "MEDICAL"
-        : "REGULAR",
-      days: leave.dateRange.days,
-      startDate: leave.dateRange.from,
-      endDate: leave.dateRange.to,
-      date: new Date(leave.createdAt).toLocaleDateString(),
-      urgent: leave.dateRange.days <= 2,
-      previouslyApprovedBy: leave.approvals.find((a) => a.level === 1)
-        ?.approverId?.personalInfo?.firstName,
-    }));
-
-    res.json({ success: true, data: formatted });
+    res.json({
+      success: true,
+      count: leaves.length,
+      data: leaves,
+    });
   } catch (err) {
-    res.status(500).json({ message: "Server error", error: err.message });
+    console.error("pending-leaves crash:", err);
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 });
 
-// POST /api/hod/dashboard/approve-leave/:leaveId
-router.post("/dashboard/approve-leave/:leaveId", async (req, res) => {
-  try {
-    const { comments } = req.body;
-    const leave = await LeaveRequest.findById(req.params.leaveId).populate(
-      "applicantId",
-      "personalInfo",
-    );
+/* ================= APPROVE / REJECT ================= */
 
-    if (!leave) {
-      return res.status(404).json({ message: "Leave request not found" });
+router.post("/action/:id", protect, onlyHod, async (req, res) => {
+  try {
+    const { action, remark, rejectionReason } = req.body;
+
+    if (!["approve", "reject"].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid action",
+      });
     }
 
-    // Generate approval letter
-    const hod = await User.findById(req.user.id);
-    const letter = await generateApprovalLetter(leave, hod);
+    /* ---------- LOAD LEAVE WITH STUDENT ---------- */
 
-    // Add HOD approval
+    const leave = await LeaveRequest.findById(req.params.id)
+      .populate("applicantId")
+      .populate("leaveType")
+      .populate("departmentId");
+
+    if (!leave) {
+      return res.status(404).json({
+        success: false,
+        message: "Leave not found",
+      });
+    }
+
+    /* ---------- LOAD APPROVER ---------- */
+
+    const approver = await User.findById(req.user._id).populate("departmentId");
+
+    /* ---------- STATUS UPDATE ---------- */
+
+    if (action === "approve") {
+      leave.status = "approved_by_hod";
+      leave.finalStatus = "approved";
+      leave.currentLevel = 3;
+
+      const letter = await generateApprovalLetter(leave, approver);
+      leave.approvalLetter = letter.url;
+    }
+
+    if (action === "reject") {
+      leave.status = "rejected_by_hod";
+      leave.finalStatus = "rejected";
+
+      const letter = await generateRejectionLetter(
+        leave,
+        approver,
+        rejectionReason || remark || "Not specified",
+      );
+
+      leave.approvalLetter = letter.url;
+    }
+
+    /* ---------- APPROVAL HISTORY ---------- */
+
     leave.approvals.push({
       level: 2,
-      approverId: req.user.id,
-      status: "approved",
-      remarks: comments,
-      approvedAt: new Date(),
+      approverId: req.user._id,
+      action,
+      remark: remark || "",
+      date: new Date(),
     });
-
-    leave.status = "approved_by_hod";
-    leave.finalStatus = "approved";
-    leave.approvalLetter = {
-      url: letter.url,
-      generatedAt: new Date(),
-      generatedBy: req.user.id,
-    };
 
     await leave.save();
 
-    // Notify student
-    await notifyStudentOfStatus(
-      leave,
-      "approved",
-      `${hod.personalInfo.firstName} ${hod.personalInfo.lastName}`,
-    );
-
     res.json({
       success: true,
-      message: "Leave finally approved",
-      data: leave,
+      message: `Leave ${action}ed by HOD`,
+      approvalLetter: leave.approvalLetter,
     });
   } catch (err) {
-    res.status(500).json({ message: "Server error", error: err.message });
+    console.error("HOD action crash:", err);
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 });
 
-// POST /api/hod/dashboard/reject-leave/:leaveId
-router.post("/dashboard/reject-leave/:leaveId", async (req, res) => {
+/* ================= HISTORY ================= */
+
+router.get("/history", protect, onlyHod, async (req, res) => {
   try {
-    const { reason } = req.body;
-    const leave = await LeaveRequest.findById(req.params.leaveId).populate(
-      "applicantId",
-      "personalInfo",
-    );
-
-    if (!leave) {
-      return res.status(404).json({ message: "Leave request not found" });
-    }
-
-    // Generate rejection letter
-    const hod = await User.findById(req.user.id);
-    const letter = await generateRejectionLetter(leave, hod, reason);
-
-    leave.approvals.push({
-      level: 2,
-      approverId: req.user.id,
-      status: "rejected",
-      remarks: reason,
-      rejectedAt: new Date(),
-    });
-
-    leave.status = "rejected";
-    leave.finalStatus = "rejected";
-    leave.rejectionLetter = {
-      url: letter.url,
-      generatedAt: new Date(),
-      generatedBy: req.user.id,
-      reason,
-    };
-
-    await leave.save();
-
-    // Notify student
-    await notifyStudentOfStatus(
-      leave,
-      "rejected",
-      `${hod.personalInfo.firstName} ${hod.personalInfo.lastName}`,
-    );
+    const leaves = await LeaveRequest.find({
+      status: { $in: ["approved_by_hod", "rejected_by_hod"] },
+    })
+      .populate("applicantId")
+      .populate("leaveType")
+      .sort({ updatedAt: -1 });
 
     res.json({
       success: true,
-      message: "Leave rejected",
-      data: leave,
+      data: leaves,
     });
   } catch (err) {
-    res.status(500).json({ message: "Server error", error: err.message });
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+/* ================= DOWNLOAD LETTER ================= */
+
+router.get("/download-letter/:id", protect, onlyHod, async (req, res) => {
+  try {
+    const leave = await LeaveRequest.findById(req.params.id);
+
+    if (!leave?.approvalLetter) {
+      return res.status(404).json({
+        success: false,
+        message: "Letter not found",
+      });
+    }
+
+    res.download(`.${leave.approvalLetter}`);
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+/* ---------------- HOD TEACHERS ---------------- */
+
+router.get("/teachers", protect, onlyHod, async (req, res) => {
+  try {
+    const teachers = await User.find({ role: "teacher" })
+      .select("-password")
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      data: teachers,
+    });
+  } catch (err) {
+    console.error("HOD teachers error:", err);
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+/* ---------------- HOD STUDENTS ---------------- */
+
+router.get("/students", protect, onlyHod, async (req, res) => {
+  try {
+    const students = await User.find({
+      role: "student",
+      isActive: true,
+    })
+      .select("-password")
+      .populate("departmentId", "name")
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      data: students,
+    });
+  } catch (err) {
+    console.error("HOD students error:", err);
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 });
 
