@@ -22,6 +22,7 @@ const TeacherLeaveRequestsScreen = ({ navigation }) => {
   const loadRequests = async () => {
     try {
       const res = await api.get("/teacher/leave-requests");
+      console.log("Loaded requests:", res.data.data?.length);
       setRequests(res.data.data || []);
     } catch (err) {
       console.error("Load leave requests error:", err);
@@ -45,28 +46,42 @@ const TeacherLeaveRequestsScreen = ({ navigation }) => {
     try {
       setProcessingId(leaveId);
 
-      await api.patch(`/teacher/leave-requests/${leaveId}`, {
-        action, // "approve" | "reject"
+      // Use the correct endpoint based on action
+      const endpoint =
+        action === "approve"
+          ? `/teacher/leaves/${leaveId}/approve`
+          : `/teacher/leaves/${leaveId}/reject`;
+
+      await api.post(endpoint, {
+        remarks:
+          action === "approve"
+            ? "Approved by class teacher"
+            : "Rejected by class teacher",
       });
 
       Alert.alert(
         "Success",
         action === "approve"
-          ? "Leave approved and department count updated"
+          ? "Leave approved and forwarded to HOD"
           : "Leave rejected",
       );
 
       loadRequests();
     } catch (err) {
       console.error("Decision error:", err);
-      Alert.alert("Error", "Failed to process leave request");
+      Alert.alert(
+        "Error",
+        err.response?.data?.message || "Failed to process leave request",
+      );
     } finally {
       setProcessingId(null);
     }
   };
 
   const renderItem = ({ item }) => {
-    const student = item.student;
+    // Fix: Use applicantId instead of student, and dateRange instead of fromDate/toDate
+    const student = item.applicantId;
+    const leaveType = item.leaveType;
 
     return (
       <View style={styles.card}>
@@ -74,14 +89,33 @@ const TeacherLeaveRequestsScreen = ({ navigation }) => {
           <Text style={styles.name}>
             {student?.personalInfo?.firstName} {student?.personalInfo?.lastName}
           </Text>
-          <Text style={styles.status}>{item.status}</Text>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: getStatusColor(item.status) },
+            ]}
+          >
+            <Text style={styles.statusText}>{item.status}</Text>
+          </View>
         </View>
 
-        <Text style={styles.meta}>From: {item.fromDate}</Text>
-        <Text style={styles.meta}>To: {item.toDate}</Text>
+        <Text style={styles.meta}>Type: {leaveType?.name || "N/A"}</Text>
+        <Text style={styles.meta}>
+          From:{" "}
+          {item.dateRange?.from
+            ? new Date(item.dateRange.from).toLocaleDateString()
+            : "N/A"}
+        </Text>
+        <Text style={styles.meta}>
+          To:{" "}
+          {item.dateRange?.to
+            ? new Date(item.dateRange.to).toLocaleDateString()
+            : "N/A"}
+        </Text>
+        <Text style={styles.meta}>Days: {item.dateRange?.days || 0}</Text>
         <Text style={styles.reason}>{item.reason}</Text>
 
-        {item.status === "pending" && (
+        {item.status === "pending" && item.currentLevel === 1 && (
           <View style={styles.actions}>
             <TouchableOpacity
               style={[styles.btn, styles.approve]}
@@ -110,10 +144,25 @@ const TeacherLeaveRequestsScreen = ({ navigation }) => {
     );
   };
 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "pending":
+        return "#F59E0B";
+      case "approved_by_teacher":
+        return "#3B82F6";
+      case "approved":
+        return "#10B981";
+      case "rejected":
+        return "#EF4444";
+      default:
+        return "#6B7280";
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#0D9488" />
       </View>
     );
   }
@@ -128,7 +177,14 @@ const TeacherLeaveRequestsScreen = ({ navigation }) => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         ListEmptyComponent={
-          <Text style={styles.empty}>No leave requests found</Text>
+          <View style={styles.emptyContainer}>
+            <Ionicons
+              name="checkmark-circle-outline"
+              size={64}
+              color="#CBD5E1"
+            />
+            <Text style={styles.empty}>No pending leave requests</Text>
+          </View>
         }
       />
     </View>
@@ -144,47 +200,77 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: "#fff",
     margin: 12,
-    padding: 14,
+    padding: 16,
     borderRadius: 12,
     elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
 
   rowBetween: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginBottom: 8,
   },
 
-  name: { fontSize: 16, fontWeight: "700" },
-  status: { fontSize: 13, fontWeight: "600", textTransform: "uppercase" },
+  name: { fontSize: 16, fontWeight: "700", color: "#1E293B" },
 
-  meta: { fontSize: 13, color: "#555", marginTop: 4 },
-  reason: { fontSize: 14, marginTop: 6 },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+
+  statusText: {
+    fontSize: 12,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    color: "#fff",
+  },
+
+  meta: { fontSize: 13, color: "#64748B", marginTop: 4 },
+
+  reason: {
+    fontSize: 14,
+    marginTop: 8,
+    color: "#374151",
+    fontStyle: "italic",
+  },
 
   actions: {
     flexDirection: "row",
     gap: 10,
-    marginTop: 12,
+    marginTop: 16,
   },
 
   btn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     borderRadius: 8,
+    flex: 1,
+    justifyContent: "center",
   },
 
-  approve: { backgroundColor: "#2ecc71" },
-  reject: { backgroundColor: "#e74c3c" },
+  approve: { backgroundColor: "#10B981" },
+  reject: { backgroundColor: "#EF4444" },
 
-  btnText: { color: "#fff", fontWeight: "600" },
+  btnText: { color: "#fff", fontWeight: "600", fontSize: 14 },
+
+  emptyContainer: {
+    alignItems: "center",
+    marginTop: 60,
+  },
 
   empty: {
     textAlign: "center",
-    marginTop: 40,
+    marginTop: 16,
     fontSize: 15,
-    color: "#777",
+    color: "#94A3B8",
   },
 });

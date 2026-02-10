@@ -28,6 +28,7 @@ import TeacherProfile from "../screens/teacher/TeacherProfile";
 import StudentList from "../screens/teacher/StudentList";
 import StudentDetail from "../screens/teacher/StudentDetail";
 import TeacherLeaveRequestsScreen from "../screens/teacher/TeacherLeaveRequestsScreen";
+import TeacherLeaveHistoryScreen from "../screens/teacher/TeacherLeaveHistoryScreen";
 
 // Student Screens
 import StudentDashboard from "../screens/student/StudentDashboard";
@@ -284,6 +285,13 @@ const AppNavigator = () => {
                   title: "Leave Requests",
                   headerStyle: { backgroundColor: "#0D9488" },
                   headerTintColor: "#fff",
+                }}
+              />
+              <Stack.Screen
+                name="TeacherLeaveHistory"
+                component={TeacherLeaveHistoryScreen}
+                options={{
+                  headerShown: false,
                 }}
               />
             </>

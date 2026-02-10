@@ -283,8 +283,9 @@ const TeacherDashboard = ({ navigation }) => {
           title="Pending Leaves"
           value={stats.pendingLeaves}
           color="#F59E0B"
-          onPress={() => {}}
+          onPress={() => navigation.navigate("TeacherLeaveHistory")}
         />
+
         <StatCard
           icon="close-circle"
           title="Absent Today"
@@ -324,6 +325,11 @@ const TeacherDashboard = ({ navigation }) => {
           >
             <Text style={styles.seeAll}>See All</Text>
           </TouchableOpacity>
+          {/* <TouchableOpacity
+            onPress={() => navigation.navigate("TeacherLeaveHistory")}
+          >
+            <Text style={styles.seeAll}>See All History</Text>
+          </TouchableOpacity> */}
         </View>
 
         {pendingLeaves.length === 0 ? (
