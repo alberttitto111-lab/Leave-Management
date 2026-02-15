@@ -11,10 +11,12 @@ import {
   Modal,
   SafeAreaView,
   Alert,
+  StatusBar,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { useFocusEffect } from "@react-navigation/native";
+import { COLORS } from "../../utils/constants";
 
 const UserItem = ({ user, onPress, onDelete }) => (
   <View style={styles.userItem}>
@@ -54,7 +56,6 @@ const UserItem = ({ user, onPress, onDelete }) => (
         <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
       </View>
     </TouchableOpacity>
-
     {/* Delete Button */}
     <TouchableOpacity
       style={styles.deleteButton}
@@ -98,15 +99,13 @@ const UserManagementScreen = ({ navigation }) => {
         ...(selectedRole !== "all" && { role: selectedRole }),
         ...(searchQuery && { search: searchQuery }),
       };
-
       const response = await api.get("/admin/users", { params });
-
+      
       if (shouldRefresh) {
         setUsers(response.data.users);
       } else {
         setUsers((prev) => [...prev, ...response.data.users]);
       }
-
       setHasMore(response.data.users.length === 20);
       setPage(pageNum);
     } catch (error) {
@@ -120,7 +119,7 @@ const UserManagementScreen = ({ navigation }) => {
   useFocusEffect(
     useCallback(() => {
       fetchUsers(1, true);
-    }, [selectedRole]),
+    }, [selectedRole])
   );
 
   const onRefresh = () => {
@@ -148,7 +147,7 @@ const UserManagementScreen = ({ navigation }) => {
   const confirmDelete = async () => {
     console.log("=== CONFIRM DELETE STARTED ===");
     console.log("User to delete:", userToDelete?._id);
-
+    
     if (!userToDelete) {
       console.error("No user set to delete!");
       return;
@@ -157,12 +156,11 @@ const UserManagementScreen = ({ navigation }) => {
     try {
       console.log(
         "Making API delete call to:",
-        `/admin/users/${userToDelete._id}`,
+        `/admin/users/${userToDelete._id}`
       );
       const response = await api.delete(`/admin/users/${userToDelete._id}`);
-
       console.log("API Response:", response.data);
-
+      
       if (response.data?.success) {
         console.log("Delete successful, removing from local state");
         setUsers((prev) => prev.filter((u) => u._id !== userToDelete._id));
@@ -177,20 +175,20 @@ const UserManagementScreen = ({ navigation }) => {
       console.error("=== API ERROR ===");
       console.error("Error type:", err.name);
       console.error("Error message:", err.message);
-
+      
       if (err.response) {
         console.error("Server responded with error:");
         console.error("Status:", err.response.status);
         console.error("Data:", err.response.data);
         Alert.alert(
           "Server Error",
-          err.response?.data?.message || `Error ${err.response.status}`,
+          err.response?.data?.message || `Error ${err.response.status}`
         );
       } else if (err.request) {
         console.error("No response received - network error");
         Alert.alert(
           "Network Error",
-          "Cannot connect to server. Check your network and server status.",
+          "Cannot connect to server. Check your network and server status."
         );
       } else {
         console.error("Request setup error:", err.message);
@@ -210,7 +208,34 @@ const UserManagementScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.admin} />
+      
+      {/* Updated Header with Back Button - Matching AddUserScreen style */}
+      <View style={[styles.header, { backgroundColor: COLORS.admin }]}>
+        <View style={styles.headerTop}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+          </TouchableOpacity>
+          
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>Users</Text>
+            <Text style={styles.headerSubtitle}>Manage system users</Text>
+          </View>
+          
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setShowFilterModal(true)}
+          >
+            <Ionicons name="filter" size={20} color={COLORS.white} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Search Bar - Moved below header */}
+      <View style={styles.searchSection}>
         <View style={styles.searchContainer}>
           <Ionicons
             name="search"
@@ -221,6 +246,7 @@ const UserManagementScreen = ({ navigation }) => {
           <TextInput
             style={styles.searchInput}
             placeholder="Search by name, ID, or email..."
+            placeholderTextColor="#94A3B8"
             value={searchQuery}
             onChangeText={setSearchQuery}
             onSubmitEditing={handleSearch}
@@ -237,14 +263,9 @@ const UserManagementScreen = ({ navigation }) => {
             </TouchableOpacity>
           )}
         </View>
-        <TouchableOpacity
-          style={styles.filterButton}
-          onPress={() => setShowFilterModal(true)}
-        >
-          <Ionicons name="filter" size={20} color="#7C3AED" />
-        </TouchableOpacity>
       </View>
 
+      {/* Stats Bar */}
       <View style={styles.statsBar}>
         <Text style={styles.statsText}>Showing {users.length} users</Text>
         <TouchableOpacity onPress={() => navigation.navigate("AddUser")}>
@@ -350,7 +371,6 @@ const UserManagementScreen = ({ navigation }) => {
               {userToDelete?.personalInfo?.lastName} ({userToDelete?.userId})?
               This action cannot be undone.
             </Text>
-
             <View style={styles.deleteModalButtons}>
               <TouchableOpacity
                 style={[styles.deleteModalButton, styles.cancelButton]}
@@ -362,7 +382,6 @@ const UserManagementScreen = ({ navigation }) => {
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-
               <TouchableOpacity
                 style={[styles.deleteModalButton, styles.confirmDeleteButton]}
                 onPress={() => {
@@ -386,21 +405,57 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8FAFC",
   },
   header: {
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 30,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+  headerTop: {
     flexDirection: "row",
-    padding: 16,
-    gap: 12,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  headerTitleContainer: {
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: COLORS.white,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: COLORS.white,
+    opacity: 0.8,
+    marginTop: 2,
+  },
+  filterButton: {
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  searchSection: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
   searchContainer: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "#fff",
     borderRadius: 10,
     paddingHorizontal: 12,
     height: 44,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   searchIcon: {
     marginRight: 8,
@@ -409,14 +464,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: "#1E293B",
-  },
-  filterButton: {
-    width: 44,
-    height: 44,
-    backgroundColor: "#F3E8FF",
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
   },
   statsBar: {
     flexDirection: "row",

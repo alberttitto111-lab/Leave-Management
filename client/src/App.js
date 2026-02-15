@@ -1,17 +1,33 @@
-import React from "react";
+// import React from "react";
+import React, { useEffect, useState } from 'react';
+import { loadFonts } from './fonts';
 import { StatusBar } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider } from "./contexts/AuthContext";
 import RootNavigator from "./navigation/RootNavigator";
 import { COLORS } from "./utils/constants";
 
+import { ToastProvider } from "./contexts/ToastContext";
+
 const App = () => {
+  const [fontsLoaded, setFontsLoaded] = useState(false);
+
+  useEffect(() => {
+    loadFonts().then(() => setFontsLoaded(true));
+  }, []);
+
+  if (!fontsLoaded) {
+    return null; // or a loading screen
+  }
+
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
-      <AuthProvider>
-        <RootNavigator />
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <RootNavigator />
+        </AuthProvider>
+      </ToastProvider>
     </SafeAreaProvider>
   );
 };

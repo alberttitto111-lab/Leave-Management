@@ -1,4 +1,5 @@
 import React from "react";
+import { View, Text, StyleSheet } from "react-native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,7 +18,7 @@ import BulkUploadScreen from "../screens/admin/BulkUploadScreen";
 import DepartmentsScreen from "../screens/admin/DepartmentScreen";
 import AddEditDepartmentScreen from "../screens/admin/AddEditDepartmentScreen";
 import EditUserScreen from "../screens/admin/EditUserScreen";
-import LeaveTypesManagementScreen from "../screens/admin/LeaveTypesManagementScreen"; // <-- ADD THIS IMPORT
+import LeaveTypesManagementScreen from "../screens/admin/LeaveTypesManagementScreen";
 
 // HOD Screens
 import HODDashboard from "../screens/HOD/HODDashboard";
@@ -40,6 +41,22 @@ import LeaveHistoryScreen from "../screens/student/LeaveHistoryScreen";
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 const StudentStack = createStackNavigator();
+
+// Custom Disabled Tab Component
+const DisabledTab = ({ label, iconName, color }) => (
+  <View style={styles.disabledTabContainer}>
+    <View style={styles.iconWrapper}>
+      <Ionicons name={iconName} size={24} color={color} />
+      <View style={styles.lockBadge}>
+        <Ionicons name="lock-closed" size={10} color="#fff" />
+      </View>
+    </View>
+    <Text style={[styles.disabledTabLabel, { color }]}>{label}</Text>
+    <View style={styles.comingSoonRibbon}>
+      <Text style={styles.comingSoonText}>SOON</Text>
+    </View>
+  </View>
+);
 
 /* -------------------- STUDENT STACK NAVIGATOR -------------------- */
 
@@ -91,24 +108,119 @@ const AdminTabs = () => (
     screenOptions={({ route }) => ({
       tabBarIcon: ({ focused, color, size }) => {
         let iconName;
+        
+        // Disabled tabs get a different treatment
+        if (route.name === "Reports" || route.name === "Settings") {
+          return (
+            <View style={styles.disabledIconContainer}>
+              <Ionicons 
+                name={route.name === "Reports" ? "bar-chart" : "settings"} 
+                size={size} 
+                color="#9CA3AF" 
+              />
+              <View style={styles.smallLockBadge}>
+                <Ionicons name="lock-closed" size={8} color="#fff" />
+              </View>
+            </View>
+          );
+        }
+        
         if (route.name === "Dashboard")
           iconName = focused ? "home" : "home-outline";
         else if (route.name === "Users")
           iconName = focused ? "people" : "people-outline";
-        else if (route.name === "Reports")
-          iconName = focused ? "bar-chart" : "bar-chart-outline";
-        else if (route.name === "Settings")
-          iconName = focused ? "settings" : "settings-outline";
+        
         return <Ionicons name={iconName} size={size} color={color} />;
       },
       tabBarActiveTintColor: "#7C3AED",
       tabBarInactiveTintColor: "gray",
+      tabBarStyle: { height: 60, paddingBottom: 5, paddingTop: 5 },
     })}
   >
-    <Tab.Screen name="Dashboard" component={AdminDashboard} />
-    <Tab.Screen name="Users" component={UserManagementScreen} />
-    <Tab.Screen name="Reports" component={AdminDashboard} />
-    <Tab.Screen name="Settings" component={AdminDashboard} />
+    <Tab.Screen 
+      name="Dashboard" 
+      component={AdminDashboard} 
+      options={{
+        tabBarLabel: "Dashboard",
+      }}
+    />
+    
+    <Tab.Screen
+      options={{ 
+        headerShown: false,
+        tabBarLabel: "Users",
+      }}
+      name="Users"
+      component={UserManagementScreen}
+    />
+    
+    {/* Disabled Reports Tab */}
+    <Tab.Screen
+      name="Reports"
+      component={View} // Empty component
+      options={{
+        tabBarLabel: ({ color }) => (
+          <View style={styles.disabledLabelContainer}>
+            <Text style={[styles.disabledLabel, { color: "#9CA3AF" }]}>Reports</Text>
+          </View>
+        ),
+        tabBarButton: (props) => (
+          <View style={styles.disabledTabButton}>
+            <View style={styles.disabledContent}>
+              {props.children}
+            </View>
+          </View>
+        ),
+        tabBarIcon: ({ size }) => (
+          <View style={styles.disabledIconContainer}>
+            <Ionicons name="bar-chart" size={size} color="#9CA3AF" />
+            <View style={styles.lockBadgeSmall}>
+              <Ionicons name="lock-closed" size={8} color="#fff" />
+            </View>
+          </View>
+        ),
+      }}
+      listeners={{
+        tabPress: (e) => {
+          // Prevent navigation
+          e.preventDefault();
+        },
+      }}
+    />
+    
+    {/* Disabled Settings Tab */}
+    <Tab.Screen
+      name="Settings"
+      component={View} // Empty component
+      options={{
+        tabBarLabel: ({ color }) => (
+          <View style={styles.disabledLabelContainer}>
+            <Text style={[styles.disabledLabel, { color: "#9CA3AF" }]}>Settings</Text>
+          </View>
+        ),
+        tabBarButton: (props) => (
+          <View style={styles.disabledTabButton}>
+            <View style={styles.disabledContent}>
+              {props.children}
+            </View>
+          </View>
+        ),
+        tabBarIcon: ({ size }) => (
+          <View style={styles.disabledIconContainer}>
+            <Ionicons name="settings" size={size} color="#9CA3AF" />
+            <View style={styles.lockBadgeSmall}>
+              <Ionicons name="lock-closed" size={8} color="#fff" />
+            </View>
+          </View>
+        ),
+      }}
+      listeners={{
+        tabPress: (e) => {
+          // Prevent navigation
+          e.preventDefault();
+        },
+      }}
+    />
   </Tab.Navigator>
 );
 
@@ -132,13 +244,11 @@ const HODTabs = () => (
     })}
   >
     <Tab.Screen name="Dashboard" component={HODDashboard} />
-
     <Tab.Screen
       name="Approvals"
       component={HodLeaveApprovals}
       options={{ headerShown: false }}
     />
-
     <Tab.Screen name="Reports" component={HODDashboard} />
   </Tab.Navigator>
 );
@@ -214,7 +324,7 @@ const AppNavigator = () => {
                 name="EditUser"
                 component={EditUserScreen}
                 options={{
-                  headerShown: true,
+                  headerShown: false,
                   title: "Edit User",
                   headerStyle: { backgroundColor: "#7C3AED" },
                   headerTintColor: "#fff",
@@ -240,12 +350,11 @@ const AppNavigator = () => {
                   headerTintColor: "#fff",
                 }}
               />
-              {/* ADD THIS NEW SCREEN */}
               <Stack.Screen
                 name="LeaveTypes"
                 component={LeaveTypesManagementScreen}
                 options={{
-                  headerShown: false, // We have custom header in the component
+                  headerShown: false,
                 }}
               />
             </>
@@ -254,7 +363,6 @@ const AppNavigator = () => {
           {user?.role === USER_ROLES.HOD && (
             <>
               <Stack.Screen name="HODMain" component={HODTabs} />
-
               <Stack.Screen
                 name="HodLeaveApprovals"
                 component={HodLeaveApprovals}
@@ -336,5 +444,99 @@ const AppNavigator = () => {
     </Stack.Navigator>
   );
 };
+
+const styles = StyleSheet.create({
+  disabledTabContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    opacity: 0.7,
+  },
+  iconWrapper: {
+    position: "relative",
+  },
+  lockBadge: {
+    position: "absolute",
+    top: -4,
+    right: -6,
+    backgroundColor: "#9CA3AF",
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: "#fff",
+  },
+  smallLockBadge: {
+    position: "absolute",
+    top: -2,
+    right: -4,
+    backgroundColor: "#9CA3AF",
+    borderRadius: 6,
+    width: 14,
+    height: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#fff",
+  },
+  disabledTabLabel: {
+    fontSize: 10,
+    marginTop: 2,
+    opacity: 0.7,
+  },
+  comingSoonRibbon: {
+    position: "absolute",
+    top: -8,
+    right: -10,
+    backgroundColor: "#F59E0B",
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  comingSoonText: {
+    color: "#fff",
+    fontSize: 6,
+    fontWeight: "bold",
+    letterSpacing: 0.5,
+  },
+  disabledTabButton: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    opacity: 0.7,
+  },
+  disabledContent: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  disabledIconContainer: {
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  lockBadgeSmall: {
+    position: "absolute",
+    top: -4,
+    right: -6,
+    backgroundColor: "#9CA3AF",
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: "#fff",
+  },
+  disabledLabelContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  disabledLabel: {
+    fontSize: 10,
+    marginTop: 2,
+    opacity: 0.7,
+  },
+});
 
 export default AppNavigator;

@@ -10,7 +10,8 @@ import {
 } from "react-native";
 import { useAuth } from "../../contexts/AuthContext";
 import { COLORS } from "../../utils/constants";
-import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+// import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import Icon from "@expo/vector-icons/MaterialCommunityIcons";
 
 const { width } = Dimensions.get("window");
 

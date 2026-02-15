@@ -11,8 +11,8 @@ import {
 } from "react-native";
 import { useAuth } from "../../contexts/AuthContext";
 import { COLORS } from "../../utils/constants";
-import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import api from "../../services/api"; // <-- import the correct api instance
+import Icon from "@expo/vector-icons/MaterialCommunityIcons";
+import api from "../../services/api";
 
 const { width } = Dimensions.get("window");
 
@@ -41,8 +41,13 @@ const AdminDashboard = ({ navigation }) => {
   };
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    // Refresh data when screen comes into focus
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchDashboardData();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -82,10 +87,43 @@ const AdminDashboard = ({ navigation }) => {
     {
       title: "Leave Types",
       icon: "calendar",
-      screen: "LeaveTypes", // Change from null to "LeaveTypes"
+      screen: "LeaveTypes",
       color: COLORS.warning,
     },
+    // Disabled Buttons
+    {
+      title: "Reports",
+      icon: "chart-bar",
+      screen: null,
+      color: COLORS.gray,
+      disabled: true,
+      disabledIcon: "lock-outline",
+      disabledMessage: "Coming Soon",
+    },
+    {
+      title: "Settings",
+      icon: "cog",
+      screen: null,
+      color: COLORS.gray,
+      disabled: true,
+      disabledIcon: "lock-outline",
+      disabledMessage: "Coming Soon",
+    },
   ];
+
+  const DisabledBadge = ({ message }) => (
+    <View style={styles.disabledBadge}>
+      <Icon name="lock" size={10} color="#fff" />
+      <Text style={styles.disabledBadgeText}>{message}</Text>
+    </View>
+  );
+
+  const ComingSoonOverlay = () => (
+    <View style={styles.comingSoonOverlay}>
+      <Icon name="clock-outline" size={20} color="#fff" />
+      <Text style={styles.comingSoonText}>Coming Soon</Text>
+    </View>
+  );
 
   return (
     <View style={styles.container}>
@@ -182,27 +220,61 @@ const AdminDashboard = ({ navigation }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.actionsGrid}>
-            {quickActions.map((action, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.actionCard}
-                onPress={() =>
-                  action.screen && navigation.navigate(action.screen)
-                }
-                activeOpacity={0.8}
-              >
-                <View
-                  style={[
-                    styles.actionIcon,
-                    { backgroundColor: action.color + "15" },
-                  ]}
+            {quickActions.map((action, index) => {
+              if (action.disabled) {
+                return (
+                  <View key={index} style={[styles.actionCard, styles.disabledCard]}>
+                    <View style={styles.disabledIconContainer}>
+                      <View
+                        style={[
+                          styles.actionIcon,
+                          { backgroundColor: action.color + "15" },
+                        ]}
+                      >
+                        <Icon name={action.icon} size={28} color={action.color} />
+                      </View>
+                      <View style={styles.lockIconContainer}>
+                        <Icon name={action.disabledIcon} size={16} color="#fff" />
+                      </View>
+                    </View>
+                    <Text style={[styles.actionTitle, styles.disabledText]}>
+                      {action.title}
+                    </Text>
+                    <View style={styles.comingSoonBadge}>
+                      <Text style={styles.comingSoonBadgeText}>SOON</Text>
+                    </View>
+                  </View>
+                );
+              }
+              
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.actionCard}
+                  onPress={() => action.screen && navigation.navigate(action.screen)}
+                  activeOpacity={0.8}
                 >
-                  <Icon name={action.icon} size={28} color={action.color} />
-                </View>
-                <Text style={styles.actionTitle}>{action.title}</Text>
-              </TouchableOpacity>
-            ))}
+                  <View
+                    style={[
+                      styles.actionIcon,
+                      { backgroundColor: action.color + "15" },
+                    ]}
+                  >
+                    <Icon name={action.icon} size={28} color={action.color} />
+                  </View>
+                  <Text style={styles.actionTitle}>{action.title}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
+        </View>
+
+        {/* Coming Soon Section Note */}
+        <View style={styles.comingSoonNote}>
+          <Icon name="information-outline" size={16} color={COLORS.info} />
+          <Text style={styles.comingSoonNoteText}>
+            Reports and Settings features are under development and will be available soon.
+          </Text>
         </View>
 
         {/* Recent Activity */}
@@ -258,7 +330,7 @@ const styles = StyleSheet.create({
   logoutButton: {
     padding: 8,
     borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(255, 255, 255, 0.35)",
   },
   content: { flex: 1, marginTop: -60 },
   statsContainer: {
@@ -297,7 +369,12 @@ const styles = StyleSheet.create({
     color: COLORS.slateDark,
     marginBottom: 16,
   },
-  actionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  actionsGrid: { 
+    flexDirection: "row", 
+    flexWrap: "wrap", 
+    gap: 12,
+    justifyContent: "space-between",
+  },
   actionCard: {
     width: (width - 52) / 2,
     backgroundColor: COLORS.white,
@@ -310,6 +387,36 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
     marginBottom: 12,
+    position: "relative",
+  },
+  disabledCard: {
+    opacity: 0.8,
+    backgroundColor: "#f5f5f5",
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    borderStyle: "dashed",
+  },
+  disabledIconContainer: {
+    position: "relative",
+    marginBottom: 12,
+  },
+  lockIconContainer: {
+    position: "absolute",
+    top: -5,
+    right: -5,
+    backgroundColor: COLORS.gray,
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   actionIcon: {
     width: 56,
@@ -317,9 +424,43 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 12,
   },
   actionTitle: { fontSize: 14, fontWeight: "600", color: COLORS.slateDark },
+  disabledText: {
+    color: COLORS.gray,
+  },
+  comingSoonBadge: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: COLORS.warning,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  comingSoonBadgeText: {
+    color: "#fff",
+    fontSize: 8,
+    fontWeight: "bold",
+    letterSpacing: 0.5,
+  },
+  comingSoonNote: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.info + "15",
+    marginHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 5,
+    padding: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  comingSoonNoteText: {
+    flex: 1,
+    fontSize: 12,
+    color: COLORS.info,
+    lineHeight: 18,
+  },
   activityContainer: {
     backgroundColor: COLORS.white,
     borderRadius: 16,

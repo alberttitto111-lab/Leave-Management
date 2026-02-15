@@ -75,7 +75,7 @@ const LeaveTypeItem = ({ leaveType, onPress, onDelete }) => (
         <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
       </View>
     </TouchableOpacity>
-
+    
     <TouchableOpacity
       style={styles.deleteButton}
       onPress={() => onDelete(leaveType)}
@@ -217,6 +217,7 @@ const LeaveTypesManagementScreen = ({ navigation }) => {
           `/admin/leave-types/${editingLeaveType._id}`,
           payload,
         );
+
         if (response.data?.success) {
           setLeaveTypes((prev) =>
             prev.map((lt) =>
@@ -228,6 +229,7 @@ const LeaveTypesManagementScreen = ({ navigation }) => {
       } else {
         // Create new
         const response = await api.post("/admin/leave-types", payload);
+
         if (response.data?.success) {
           setLeaveTypes((prev) => [response.data.data, ...prev]);
           Alert.alert("Success", "Leave type created successfully");
@@ -403,6 +405,7 @@ const LeaveTypesManagementScreen = ({ navigation }) => {
         >
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
+
         <TouchableOpacity
           style={[styles.formButton, styles.saveButton]}
           onPress={handleSave}
@@ -417,32 +420,36 @@ const LeaveTypesManagementScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Updated Header with Blue Background */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.slateDark} />
+          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
+        
         <Text style={styles.headerTitle}>Leave Types</Text>
+        
         <TouchableOpacity onPress={handleAddPress}>
-          <Ionicons name="add-circle" size={28} color={COLORS.primary} />
+          <Ionicons name="add-circle" size={28} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        data={leaveTypes}
-        renderItem={({ item }) => (
-          <LeaveTypeItem
-            leaveType={item}
-            onPress={handleEditPress}
-            onDelete={handleDeletePress}
-          />
-        )}
-        keyExtractor={(item) => item._id}
-        contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        ListEmptyComponent={
-          !loading && (
+      {/* Main ScrollView - Fixed scrolling issue */}
+      <View style={styles.scrollViewContainer}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          showsVerticalScrollIndicator={true}
+          bounces={true}
+          alwaysBounceVertical={true}
+        >
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#2563EB" />
+              <Text style={styles.loadingText}>Loading leave types...</Text>
+            </View>
+          ) : leaveTypes.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={64} color="#CBD5E1" />
               <Text style={styles.emptyText}>No leave types found</Text>
@@ -455,9 +462,19 @@ const LeaveTypesManagementScreen = ({ navigation }) => {
                 </Text>
               </TouchableOpacity>
             </View>
-          )
-        }
-      />
+          ) : (
+            leaveTypes.map((item) => (
+              <LeaveTypeItem
+                key={item._id}
+                leaveType={item}
+                onPress={handleEditPress}
+                onDelete={handleDeletePress}
+              />
+            ))
+          )}
+          <View style={styles.bottomPadding} />
+        </ScrollView>
+      </View>
 
       {/* Add/Edit Modal */}
       <Modal
@@ -537,17 +554,40 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: "#fff",
+    backgroundColor: "#7C3AED",
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: "#e5f0e2",
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#1E293B",
+    color: "#FFFFFF",
   },
-  listContainer: {
+  // New container for ScrollView to ensure proper sizing
+  scrollViewContainer: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
     padding: 16,
+    paddingBottom: 20,
+    flexGrow: 1, // Ensures content can grow
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    minHeight: 200, // Ensures loading container has height
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: "#64748B",
+  },
+  bottomPadding: {
+    height: 20,
   },
   leaveTypeItem: {
     flexDirection: "row",
@@ -654,6 +694,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingTop: 100,
+    minHeight: 300, // Ensures empty state has height
   },
   emptyText: {
     color: "#94A3B8",
@@ -662,7 +703,7 @@ const styles = StyleSheet.create({
   },
   addFirstButton: {
     marginTop: 20,
-    backgroundColor: COLORS.primary,
+    backgroundColor: "#2563EB",
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
@@ -671,6 +712,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "600",
   },
+
   // Modal styles
   modalContainer: {
     flex: 1,
@@ -729,12 +771,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "#e3e3e3",
     marginRight: 8,
     marginBottom: 8,
   },
   applicableOptionSelected: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: "#7f4bd7",
   },
   applicableOptionText: {
     color: "#64748B",
@@ -767,21 +809,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   cancelButton: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "#aeb2b7",
   },
   cancelButtonText: {
-    color: "#64748B",
+    color: "#000000",
     fontWeight: "600",
     fontSize: 16,
   },
   saveButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: "#7C3AED",
   },
   saveButtonText: {
     color: "#fff",
     fontWeight: "600",
     fontSize: 16,
   },
+
   // Delete modal styles
   deleteModalOverlay: {
     flex: 1,

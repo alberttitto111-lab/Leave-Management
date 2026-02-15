@@ -753,4 +753,48 @@ router.delete(
     }
   },
 );
+
+
+
+// DELETE department - PERMANENT DELETE
+router.delete("/departments/:id", protect, authorize("admin"), async (req, res) => {
+  try {
+    const department = await Department.findById(req.params.id);
+    
+    if (!department) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Department not found" 
+      });
+    }
+
+    // Check if department has users assigned
+    const usersInDepartment = await User.countDocuments({ 
+      departmentId: department._id 
+    });
+
+    if (usersInDepartment > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Cannot delete department with assigned users. Please reassign or delete users first." 
+      });
+    }
+
+    // PERMANENT DELETE - remove from database
+    await Department.findByIdAndDelete(req.params.id);
+
+    res.json({ 
+      success: true, 
+      message: "Department permanently deleted successfully" 
+    });
+  } catch (err) {
+    console.error("Delete department error:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to delete department",
+      error: err.message 
+    });
+  }
+});
+
 export default router;
