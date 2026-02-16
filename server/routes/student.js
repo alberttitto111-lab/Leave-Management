@@ -426,4 +426,94 @@ router.get("/leave-balance/:leaveTypeId", async (req, res) => {
   }
 });
 
+/* ================= student profile ================= */
+
+router.get("/profile", protect, authorize("student"), async (req, res) => {
+  try {
+    const student = await User.findById(req.user.id)
+      .select("-password")
+      .populate("departmentId", "name code");
+    
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found"
+      });
+    }
+
+    // Get academic info
+    const academic = await StudentAcademic.findOne({ 
+      userId: student._id 
+    }).populate("classTeacherId", "personalInfo.firstName personalInfo.lastName")
+      .populate("hodId", "personalInfo.firstName personalInfo.lastName");
+
+    res.json({
+      success: true,
+      data: {
+        ...student.toObject(),
+        academicInfo: academic?.academicInfo || null,
+        classTeacher: academic?.classTeacherId || null,
+        hod: academic?.hodId || null
+      }
+    });
+  } catch (err) {
+    console.error("Profile fetch error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch profile"
+    });
+  }
+});
+
+// PATCH update student profile
+router.patch("/profile", protect, authorize("student"), async (req, res) => {
+  try {
+    const { personalInfo, academicInfo } = req.body;
+    
+    // Update user personal info
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    if (personalInfo) {
+      user.personalInfo = {
+        ...user.personalInfo,
+        ...personalInfo
+      };
+      await user.save();
+    }
+
+    // Update academic info if provided
+    if (academicInfo) {
+      const academic = await StudentAcademic.findOne({ userId: user._id });
+      if (academic) {
+        academic.academicInfo = {
+          ...academic.academicInfo,
+          ...academicInfo,
+          parentDetails: {
+            ...academic.academicInfo?.parentDetails,
+            ...academicInfo.parentDetails
+          }
+        };
+        await academic.save();
+      }
+    }
+
+    res.json({
+      success: true,
+      message: "Profile updated successfully"
+    });
+  } catch (err) {
+    console.error("Profile update error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update profile"
+    });
+  }
+});
+
 export default router;

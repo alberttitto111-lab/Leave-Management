@@ -38,6 +38,8 @@ import TeacherLeaveHistoryScreen from "../screens/teacher/TeacherLeaveHistoryScr
 import StudentDashboard from "../screens/student/StudentDashboard";
 import LeaveHistoryScreen from "../screens/student/LeaveHistoryScreen";
 
+import EditStudentProfileScreen from "../screens/student/EditStudentProfileScreen";
+
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 const StudentStack = createStackNavigator();
@@ -452,8 +454,17 @@ const AppNavigator = () => {
             </>
           )}
 
-          {user?.role === USER_ROLES.STUDENT && (
-            <Stack.Screen name="StudentMain" component={StudentTabs} />
+          {user?.role === USER_ROLES.STUDENT && (                                        /// just added this for testing, will remove later
+            <>
+              <Stack.Screen name="StudentMain" component={StudentTabs} />
+              <Stack.Screen 
+                name="EditStudentProfile" 
+                component={EditStudentProfileScreen} 
+                options={{ 
+                  headerShown: false,
+                }}
+              />
+            </>
           )}
 
           {user?.role === USER_ROLES.STAFF && (

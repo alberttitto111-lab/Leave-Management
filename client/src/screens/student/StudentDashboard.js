@@ -136,6 +136,34 @@ const StudentDashboard = ({ navigation }) => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Function to optimistically update UI with new leave request
+  const optimisticallyAddLeaveRequest = (newLeaveRequest) => {
+    // Create a temporary leave object that matches the structure from API
+    const tempLeave = {
+      _id: newLeaveRequest._id || `temp-${Date.now()}`,
+      leaveType: newLeaveRequest.leaveType || leaveTypes.find(t => t._id === formData.leaveTypeId),
+      dateRange: {
+        from: formData.fromDate,
+        to: formData.toDate,
+        days: calculateDays(),
+      },
+      reason: formData.reason,
+      status: "pending",
+      finalStatus: "pending",
+      createdAt: new Date().toISOString(),
+    };
+
+    // Update recent leaves (add to beginning)
+    setRecentLeaves(prev => [tempLeave, ...prev].slice(0, 5)); // Keep only 5 most recent
+
+    // Update stats
+    setStats(prev => ({
+      ...prev,
+      pendingLeaves: prev.pendingLeaves + 1,
+      totalLeaves: prev.totalLeaves + 1,
+    }));
+  };
+
   const handleSubmitLeave = async () => {
     setErrors({});
 
@@ -149,6 +177,30 @@ const StudentDashboard = ({ navigation }) => {
     }
 
     setSubmitting(true);
+    
+    // Find the selected leave type for optimistic update
+    const selectedLeaveType = leaveTypes.find(t => t._id === formData.leaveTypeId);
+    
+    // Create optimistic leave request
+    const optimisticLeave = {
+      leaveType: selectedLeaveType,
+      dateRange: {
+        from: formData.fromDate,
+        to: formData.toDate,
+        days: calculateDays(),
+      },
+      reason: formData.reason,
+      status: "pending",
+      finalStatus: "pending",
+    };
+
+    // Optimistically update UI
+    optimisticallyAddLeaveRequest(optimisticLeave);
+
+    // Close modal immediately for better UX
+    setModalVisible(false);
+    resetForm();
+
     try {
       const payload = {
         leaveTypeId: formData.leaveTypeId.toString(),
@@ -164,16 +216,23 @@ const StudentDashboard = ({ navigation }) => {
       const response = await api.post("/student/leave-request", payload);
       console.log("API response:", response.data);
 
-      Alert.alert("Success", "Leave request submitted successfully", [
-        {
-          text: "OK",
-          onPress: () => {
-            setModalVisible(false);
-            resetForm();
-            fetchDashboardData();
-          },
-        },
-      ]);
+      // If the API returns the actual created leave, replace the optimistic one
+      if (response.data?.data) {
+        setRecentLeaves(prev => {
+          // Replace the optimistic entry with the real one
+          const filtered = prev.filter(l => !l._id?.startsWith('temp-'));
+          return [response.data.data, ...filtered].slice(0, 5);
+        });
+      }
+
+      // Show a subtle success message that auto-dismisses
+      Alert.alert(
+        "Success", 
+        "Leave request submitted successfully",
+        [{ text: "OK", onPress: () => {} }],
+        { cancelable: true }
+      );
+      
     } catch (error) {
       console.error("Submit error:", error);
       console.error("Error response:", error.response?.data);
@@ -184,6 +243,9 @@ const StudentDashboard = ({ navigation }) => {
         error.message ||
         "Failed to submit request";
 
+      // Revert optimistic update on error
+      fetchDashboardData(); // Refresh to get correct state
+      
       Alert.alert("Error", errorMessage);
     } finally {
       setSubmitting(false);
@@ -263,7 +325,7 @@ const StudentDashboard = ({ navigation }) => {
     {
       title: "My Profile",
       icon: "account-circle",
-      action: () => navigation.navigate("Profile"),
+      action: () => navigation.navigate("EditStudentProfile"),
       color: COLORS.success,
     },
   ];
