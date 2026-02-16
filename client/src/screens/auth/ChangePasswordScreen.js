@@ -73,7 +73,7 @@ const ChangePasswordScreen = ({ navigation }) => {
         <View style={styles.headerContent}>
           <Icon name="shield-lock" size={40} color={COLORS.white} />
           <Text style={styles.title}>Security Setup</Text>
-          <Text style={styles.subtitle}>Change your temporary password</Text>
+          {/* <Text style={styles.subtitle}>Change your temporary password</Text> */}
         </View>
       </View>
 
@@ -85,7 +85,7 @@ const ChangePasswordScreen = ({ navigation }) => {
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+          showsVerticalScrollIndicator={true}
         >
           <View style={styles.card}>
             <PasswordChangeForm
@@ -111,9 +111,9 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: COLORS.primary,
     paddingTop: Platform.OS === "ios" ? 60 : 40,
-    paddingBottom: 50,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+    paddingBottom: 40,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
   },
   headerContent: {
     alignItems: "center",
@@ -124,19 +124,19 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     marginTop: 16,
   },
-  subtitle: {
-    fontSize: 14,
-    color: COLORS.white,
-    opacity: 0.9,
-    marginTop: 4,
-  },
+  // subtitle: {
+  //   fontSize: 14,
+  //   color: COLORS.white,
+  //   opacity: 0.9,
+  //   marginTop: 4,
+  // },
   formContainer: {
     flex: 1,
     marginTop: -20,
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 30,
     paddingBottom: 30,
   },
   card: {

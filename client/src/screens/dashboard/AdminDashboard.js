@@ -314,7 +314,7 @@ const AdminDashboard = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  header: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 80 },
+  header: { paddingTop: 30, paddingHorizontal: 20, paddingBottom: 70 },
   headerTop: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
   },
   greeting: { fontSize: 14, color: COLORS.white, opacity: 0.8 },
   userName: {
-    fontSize: 24,
+    fontSize: 30,
     fontWeight: "bold",
     color: COLORS.white,
     marginTop: 4,
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "rgba(255, 255, 255, 0.35)",
   },
-  content: { flex: 1, marginTop: -60 },
+  content: { flex: 1, marginTop: 2 },  ///change to create a small gap between header and content
   statsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",

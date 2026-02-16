@@ -252,13 +252,13 @@ const StudentDashboard = ({ navigation }) => {
       title: "Apply Leave",
       icon: "calendar-plus",
       action: () => setModalVisible(true),
-      color: COLORS.primary,
+      color: "#c21c3a" ,
     },
     {
       title: "Leave History",
       icon: "history",
       action: () => navigation.navigate("LeaveHistory"),
-      color: COLORS.info,
+      color: "#662fdc",
     },
     {
       title: "My Profile",
@@ -281,10 +281,10 @@ const StudentDashboard = ({ navigation }) => {
             value={date.toISOString().split("T")[0]}
             onChange={(e) => onChange(new Date(e.target.value))}
             style={{
-              width: "100%",
+              width: "95%",
               padding: 12,
               borderRadius: 12,
-              border: `1px solid ${error ? COLORS.danger : "#E2E8F0"}`,
+              border: `1px solid ${error ? COLORS.danger : "#c2c3c4"}`,
               fontSize: 14,
               fontFamily: "inherit",
             }}
@@ -658,24 +658,22 @@ const StudentDashboard = ({ navigation }) => {
                 />
               </View>
 
-              <TouchableOpacity
-                style={styles.halfDayContainer}
-                onPress={() =>
-                  setFormData({ ...formData, halfDay: !formData.halfDay })
-                }
-              >
-                <View
+              {/* Modified Half Day Leave - Now only checkbox is clickable */}
+              <View style={styles.halfDayContainer}>
+                <TouchableOpacity
                   style={[
                     styles.checkbox,
                     formData.halfDay && styles.checkboxActive,
                   ]}
+                  onPress={() => setFormData({ ...formData, halfDay: !formData.halfDay })}
+                  activeOpacity={0.7}
                 >
                   {formData.halfDay && (
                     <Icon name="check" size={16} color={COLORS.white} />
                   )}
-                </View>
+                </TouchableOpacity>
                 <Text style={styles.halfDayText}>Half Day Leave</Text>
-              </TouchableOpacity>
+              </View>
 
               <View style={styles.daysCalculation}>
                 <Text style={styles.daysLabel}>Total Days:</Text>
@@ -730,7 +728,7 @@ const StudentDashboard = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  header: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 80 },
+  header: { paddingTop: 40, paddingHorizontal: 20, paddingBottom: 80 },
   headerTop: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -767,6 +765,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 20,
     marginBottom: 20,
+    marginTop: 60,
+    paddingVertical: 5,
     gap: 12,
   },
   quickActionButton: {

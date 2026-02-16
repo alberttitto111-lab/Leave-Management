@@ -107,13 +107,13 @@ const PasswordChangeForm = ({ onSubmit, loading }) => {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.formContainer}>
-          <View style={styles.infoBox}>
+          {/* <View style={styles.infoBox}>
             <Icon name="information" size={20} color={COLORS.primary} />
             <Text style={styles.infoText}>
               For security reasons, you must change your password before
               continuing.
             </Text>
-          </View>
+          </View> */}
 
           <Input
             label="Current Password"

@@ -67,7 +67,7 @@ const StudentStackNavigator = () => (
       name="LeaveHistory"
       component={LeaveHistoryScreen}
       options={{
-        headerShown: true,
+        headerShown: false,
         title: "Leave History",
         headerStyle: { backgroundColor: "#2563EB" },
         headerTintColor: "#fff",
@@ -96,10 +96,30 @@ const StudentTabs = () => (
       tabBarInactiveTintColor: "gray",
     })}
   >
-    <Tab.Screen name="Home" component={StudentStackNavigator} />
-    <Tab.Screen name="Apply" component={StudentDashboard} />
-    <Tab.Screen name="History" component={LeaveHistoryScreen} />
-    <Tab.Screen name="Profile" component={StudentDashboard} />
+    <Tab.Screen options={{ 
+        headerShown: false,
+        tabBarLabel: "Home",
+      }}
+      name="Home" component={StudentStackNavigator} />
+
+    <Tab.Screen options={{ 
+        headerShown: false,
+        tabBarLabel: "Apply",
+      }}
+      name="Apply" 
+      component={StudentDashboard} />
+
+    <Tab.Screen options={{ 
+        headerShown: false,
+        tabBarLabel: "History",
+      }}
+      name="History" component={LeaveHistoryScreen} />
+
+    <Tab.Screen options={{ 
+        headerShown: false,
+        tabBarLabel: "Profile",
+      }}
+    name="Profile" component={StudentDashboard} />
   </Tab.Navigator>
 );
 
