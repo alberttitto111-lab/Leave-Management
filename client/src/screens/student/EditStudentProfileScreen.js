@@ -110,62 +110,59 @@ const EditStudentProfileScreen = ({ navigation }) => {
   };
 
   const handleSave = async () => {
-  setSaving(true);
-  try {
-    const payload = {
-      userId,
-      personalInfo: {
-        firstName,
-        lastName,
-        email,
-        phone,
-        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
-        gender,
-        address,
-      },
-      academicInfo: {
-        rollNumber,
-        class: className,
-        section,
-        batchYear: parseInt(batchYear) || new Date().getFullYear(),
-      },
-      departmentId: departmentId || null,
-    };
+    setSaving(true);
+    try {
+      const payload = {
+        userId,
+        personalInfo: {
+          firstName,
+          lastName,
+          email,
+          phone,
+          dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+          gender,
+          address,
+        },
+        departmentId: departmentId || null,
+      };
 
-    console.log("Saving payload:", payload);
+      console.log("Saving payload:", payload);
 
-    const response = await api.patch(`/student/profile`, payload);
-    
-    if (response.data?.success) {
-      setIsUpdated(true);
+      const response = await api.patch(`/student/profile`, payload);
       
-      // Refresh the user profile in AuthContext
-      await refreshUserProfile();
-      
-      Alert.alert("Success", "Profile updated successfully", [
-        { text: "OK", onPress: () => navigation.goBack() }
-      ]);
+      if (response.data?.success) {
+        setIsUpdated(true);
+        
+        // Refresh the user profile in AuthContext
+        await refreshUserProfile();
+        
+        Alert.alert("Success", "Profile updated successfully", [
+          { text: "OK", onPress: () => navigation.goBack() }
+        ]);
+      }
+    } catch (error) {
+      console.error("Save error:", error);
+      Alert.alert(
+        "Error",
+        error.response?.data?.message || "Failed to update profile"
+      );
+    } finally {
+      setSaving(false);
     }
-  } catch (error) {
-    console.error("Save error:", error);
-    Alert.alert(
-      "Error",
-      error.response?.data?.message || "Failed to update profile"
-    );
-  } finally {
-    setSaving(false);
-  }
-};
+  };
 
-  const InputField = ({ label, value, onChangeText, placeholder, icon, multiline, keyboardType, required, containerStyle }) => (
+  const InputField = ({ label, value, onChangeText, placeholder, icon, multiline, keyboardType, required, containerStyle, editable = true, disabledIcon = false }) => (
     <View style={[styles.inputContainer, containerStyle]}>
-      <Text style={styles.label}>
-        {label} {required && <Text style={styles.required}>*</Text>}
-      </Text>
-      <View style={styles.inputWrapper}>
-        <Ionicons name={icon} size={20} color={COLORS.primary} style={styles.inputIcon} />
+      <View style={styles.labelContainer}>
+        <Text style={styles.label}>
+          {label} {required && <Text style={styles.required}>*</Text>}
+        </Text>
+        {disabledIcon && <Ionicons name="lock-closed" size={14} color={COLORS.slateLight} style={styles.disabledIcon} />}
+      </View>
+      <View style={[styles.inputWrapper, !editable && styles.inputWrapperDisabled]}>
+        <Ionicons name={icon} size={20} color={!editable ? COLORS.slateLight : COLORS.primary} style={styles.inputIcon} />
         <TextInput
-          style={[styles.input, multiline && styles.textArea]}
+          style={[styles.input, multiline && styles.textArea, !editable && styles.inputDisabled]}
           value={value}
           onChangeText={(text) => {
             onChangeText(text);
@@ -175,34 +172,42 @@ const EditStudentProfileScreen = ({ navigation }) => {
           placeholderTextColor={COLORS.slateLight}
           multiline={multiline}
           keyboardType={keyboardType}
-          editable={!saving}
+          editable={editable && !saving}
         />
       </View>
     </View>
   );
 
-  const SelectField = ({ label, value, onSelect, options, icon, required, containerStyle }) => (
+  const SelectField = ({ label, value, onSelect, options, icon, required, containerStyle, editable = true, disabledIcon = false }) => (
     <View style={[styles.inputContainer, containerStyle]}>
-      <Text style={styles.label}>
-        {label} {required && <Text style={styles.required}>*</Text>}
-      </Text>
-      <View style={styles.optionsContainer}>
+      <View style={styles.labelContainer}>
+        <Text style={styles.label}>
+          {label} {required && <Text style={styles.required}>*</Text>}
+        </Text>
+        {disabledIcon && <Ionicons name="lock-closed" size={14} color={COLORS.slateLight} style={styles.disabledIcon} />}
+      </View>
+      <View style={[styles.optionsContainer, !editable && styles.optionsContainerDisabled]}>
         {options.map((option) => (
           <TouchableOpacity
             key={option.value}
             style={[
               styles.optionButton,
               value === option.value && styles.optionButtonSelected,
+              !editable && styles.optionButtonDisabled,
             ]}
             onPress={() => {
-              onSelect(option.value);
-              setIsUpdated(false);
+              if (editable) {
+                onSelect(option.value);
+                setIsUpdated(false);
+              }
             }}
+            disabled={!editable}
           >
             <Text
               style={[
                 styles.optionText,
                 value === option.value && styles.optionTextSelected,
+                !editable && styles.optionTextDisabled,
               ]}
             >
               {option.label}
@@ -215,7 +220,7 @@ const EditStudentProfileScreen = ({ navigation }) => {
 
   const DepartmentSelector = () => (
     <View style={styles.inputContainer}>
-      <Text style={styles.label}>Department</Text>
+      {/* <Text style={styles.label}>Department</Text> */}
       <View style={styles.departmentsContainer}>
         {departments.map((dept) => (
           <TouchableOpacity
@@ -270,7 +275,7 @@ const EditStudentProfileScreen = ({ navigation }) => {
     </View>
   );
 
-  // Step 3: Personal Information
+  // Step 3: Personal Information (with disabled Date of Birth and Gender)
   const renderStep3 = () => (
     <View style={styles.stepContainer}>
       <Text style={styles.stepTitle}>Personal Information</Text>
@@ -322,7 +327,7 @@ const EditStudentProfileScreen = ({ navigation }) => {
         </View>
       </View>
       
-      {/* Date of Birth and Gender side by side */}
+      {/* Date of Birth and Gender side by side - DISABLED with lock icons */}
       <View style={styles.row}>
         <View style={styles.dateFieldWidth}>
           <InputField
@@ -331,6 +336,8 @@ const EditStudentProfileScreen = ({ navigation }) => {
             onChangeText={setDateOfBirth}
             placeholder="MM/DD/YYYY"
             icon="calendar-outline"
+            editable={false}
+            disabledIcon={true}
           />
         </View>
         <View style={styles.genderFieldWidth}>
@@ -344,6 +351,8 @@ const EditStudentProfileScreen = ({ navigation }) => {
               { label: "Other", value: "other" },
             ]}
             icon="people-outline"
+            editable={false}
+            disabledIcon={true}
           />
         </View>
       </View>
@@ -359,52 +368,14 @@ const EditStudentProfileScreen = ({ navigation }) => {
     </View>
   );
 
-  // Step 4: Academic Information
+  // Step 4: Academic Information (Now Read-only)
   const renderStep4 = () => (
     <View style={styles.stepContainer}>
       <Text style={styles.stepTitle}>Academic Information</Text>
-      
-      <InputField
-        label="Roll Number"
-        value={rollNumber}
-        onChangeText={setRollNumber}
-        placeholder="Enter roll number"
-        icon="id-card-outline"
-        required
-      />
-      
-      <View style={styles.row}>
-        <View style={styles.halfWidth}>
-          <InputField
-            label="Class"
-            value={className}
-            onChangeText={setClassName}
-            placeholder="e.g., 10"
-            icon="school-outline"
-            required
-          />
-        </View>
-        <View style={styles.halfWidth}>
-          <InputField
-            label="Section"
-            value={section}
-            onChangeText={setSection}
-            placeholder="e.g., A"
-            icon="git-branch-outline"
-            required
-          />
-        </View>
-      </View>
-      
-      <InputField
-        label="Batch Year"
-        value={batchYear}
-        onChangeText={setBatchYear}
-        placeholder="2024"
-        icon="calendar-outline"
-        keyboardType="number-pad"
-        required
-      />
+      <InfoRow label="Roll Number" value={rollNumber} />
+      <InfoRow label="Class" value={className} />
+      <InfoRow label="Section" value={section} />
+      <InfoRow label="Batch Year" value={batchYear} />
     </View>
   );
 
@@ -417,13 +388,7 @@ const EditStudentProfileScreen = ({ navigation }) => {
     }
     return true;
   };
-  const validateStep4 = () => {
-    if (!rollNumber.trim() || !className.trim() || !section.trim() || !batchYear.trim()) {
-      Alert.alert("Validation Error", "All academic fields are required");
-      return false;
-    }
-    return true;
-  };
+  const validateStep4 = () => true; // Academic info is read-only, always valid
 
   if (loading) {
     return (
@@ -666,14 +631,21 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginBottom: 16,
   },
+  labelContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
   label: {
     fontSize: 14,
     fontWeight: "600",
     color: COLORS.slateDark,
-    marginBottom: 6,
   },
   required: {
     color: COLORS.danger,
+  },
+  disabledIcon: {
+    marginLeft: 6,
   },
   inputWrapper: {
     flexDirection: "row",
@@ -684,6 +656,10 @@ const styles = StyleSheet.create({
     borderColor: COLORS.grayLight,
     paddingHorizontal: 12,
   },
+  inputWrapperDisabled: {
+    backgroundColor: COLORS.grayLight + "30",
+    borderColor: COLORS.grayLight,
+  },
   inputIcon: {
     marginRight: 10,
   },
@@ -692,6 +668,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 14,
     color: COLORS.slateDark,
+  },
+  inputDisabled: {
+    color: COLORS.slateLight,
   },
   textArea: {
     height: 80,
@@ -721,6 +700,9 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
   },
+  optionsContainerDisabled: {
+    opacity: 0.7,
+  },
   optionButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -733,6 +715,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
   },
+  optionButtonDisabled: {
+    backgroundColor: COLORS.grayLight + "30",
+    borderColor: COLORS.grayLight,
+  },
   optionText: {
     fontSize: 14,
     color: COLORS.slate,
@@ -740,6 +726,9 @@ const styles = StyleSheet.create({
   optionTextSelected: {
     color: COLORS.white,
     fontWeight: "500",
+  },
+  optionTextDisabled: {
+    color: COLORS.slateLight,
   },
   departmentsContainer: {
     flexDirection: "row",
