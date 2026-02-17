@@ -167,8 +167,9 @@ export const getUserById = asyncHandler(async (req, res, next) => {
   });
 });
 
+// Update this function in adminController.js
 export const updateUser = asyncHandler(async (req, res, next) => {
-  const { personalInfo, departmentId, isActive, assignedClasses } = req.body;
+  const { personalInfo, departmentId, isActive, assignedClasses, academicInfo } = req.body;
 
   const user = await User.findById(req.params.id);
 
@@ -184,14 +185,31 @@ export const updateUser = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse("Cannot deactivate system admin", 400));
   }
 
+  // Update basic info
   if (personalInfo) {
     Object.assign(user.personalInfo, personalInfo);
   }
+
   if (departmentId) user.departmentId = departmentId;
   if (typeof isActive === "boolean") user.isActive = isActive;
   if (assignedClasses) user.assignedClasses = assignedClasses;
 
   await user.save();
+
+  // Update student academic info if provided
+  if (user.role === "student" && academicInfo) {
+    const studentAcademic = await StudentAcademic.findOne({ 
+      userId: user._id 
+    });
+
+    if (studentAcademic) {
+      studentAcademic.academicInfo = {
+        ...studentAcademic.academicInfo,
+        ...academicInfo,
+      };
+      await studentAcademic.save();
+    }
+  }
 
   logger.info(`User updated: ${user.userId} by admin ${req.user.userId}`);
 

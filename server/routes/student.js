@@ -6,11 +6,93 @@ import LeaveRequest from "../models/LeaveRequest.js";
 import LeaveType from "../models/LeaveType.js";
 import { protect, authorize } from "../middleware/auth.js";
 import { notifyTeacherOfNewLeave } from "../utils/notificationService.js";
+import {
+  getDashboardStats,
+  getLeaveHistory,
+  getLeaveTypes,
+  createLeaveRequest,
+  downloadLetter,
+  getLeaveBalance,
+  getStudentProfile,
+  updateStudentProfile,
+} from "../controllers/studentController.js";
 
 const router = express.Router();
 
 router.use(protect);
 router.use(authorize("student"));
+
+// Profile routes
+router.get("/profile", getStudentProfile);
+router.patch("/profile", updateStudentProfile);
+
+// Dashboard stats
+router.get("/dashboard-stats", getDashboardStats);
+
+// Leave history
+router.get("/leave-history", getLeaveHistory);
+
+// Leave types
+router.get("/leave-types", getLeaveTypes);
+
+// Create leave request
+router.post("/leave-request", createLeaveRequest);
+
+// Download letter
+router.get("/download-letter/:leaveId", downloadLetter);
+
+// Leave balance
+router.get("/leave-balance/:leaveTypeId", getLeaveBalance);
+
+// Delete leave request
+router.delete("/leave/:id", async (req, res) => {
+  try {
+    const leaveId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(leaveId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid leave ID",
+      });
+    }
+
+    const leave = await LeaveRequest.findById(leaveId);
+
+    if (!leave) {
+      return res.status(404).json({
+        success: false,
+        message: "Leave not found",
+      });
+    }
+
+    if (leave.applicantId.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: "Not allowed",
+      });
+    }
+
+    if (leave.finalStatus !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot delete processed leave",
+      });
+    }
+
+    await LeaveRequest.findByIdAndDelete(leaveId);
+
+    res.json({
+      success: true,
+      message: "Leave deleted",
+    });
+  } catch (err) {
+    console.error("Delete leave error:", err);
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
 
 /* ================= DASHBOARD STATS ================= */
 

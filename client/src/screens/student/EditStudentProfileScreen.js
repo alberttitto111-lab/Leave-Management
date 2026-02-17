@@ -18,7 +18,7 @@ import { COLORS } from "../../utils/constants";
 import { useAuth } from "../../contexts/AuthContext";
 
 const EditStudentProfileScreen = ({ navigation }) => {
-  const { user } = useAuth();
+  const { user, refreshUserProfile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState(null);
@@ -110,48 +110,52 @@ const EditStudentProfileScreen = ({ navigation }) => {
   };
 
   const handleSave = async () => {
-    setSaving(true);
-    try {
-      const payload = {
-        userId,
-        personalInfo: {
-          firstName,
-          lastName,
-          email,
-          phone,
-          dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
-          gender,
-          address,
-        },
-        academicInfo: {
-          rollNumber,
-          class: className,
-          section,
-          batchYear: parseInt(batchYear) || new Date().getFullYear(),
-        },
-        departmentId: departmentId || null,
-      };
+  setSaving(true);
+  try {
+    const payload = {
+      userId,
+      personalInfo: {
+        firstName,
+        lastName,
+        email,
+        phone,
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+        gender,
+        address,
+      },
+      academicInfo: {
+        rollNumber,
+        class: className,
+        section,
+        batchYear: parseInt(batchYear) || new Date().getFullYear(),
+      },
+      departmentId: departmentId || null,
+    };
 
-      console.log("Saving payload:", payload);
+    console.log("Saving payload:", payload);
 
-      const response = await api.patch(`/admin/users/${profile._id}`, payload);
+    const response = await api.patch(`/student/profile`, payload);
+    
+    if (response.data?.success) {
+      setIsUpdated(true);
       
-      if (response.data) {
-        setIsUpdated(true);
-        Alert.alert("Success", "Profile updated successfully", [
-          { text: "OK", onPress: () => navigation.goBack() }
-        ]);
-      }
-    } catch (error) {
-      console.error("Save error:", error);
-      Alert.alert(
-        "Error",
-        error.response?.data?.message || "Failed to update profile"
-      );
-    } finally {
-      setSaving(false);
+      // Refresh the user profile in AuthContext
+      await refreshUserProfile();
+      
+      Alert.alert("Success", "Profile updated successfully", [
+        { text: "OK", onPress: () => navigation.goBack() }
+      ]);
     }
-  };
+  } catch (error) {
+    console.error("Save error:", error);
+    Alert.alert(
+      "Error",
+      error.response?.data?.message || "Failed to update profile"
+    );
+  } finally {
+    setSaving(false);
+  }
+};
 
   const InputField = ({ label, value, onChangeText, placeholder, icon, multiline, keyboardType, required, containerStyle }) => (
     <View style={[styles.inputContainer, containerStyle]}>
@@ -266,95 +270,94 @@ const EditStudentProfileScreen = ({ navigation }) => {
     </View>
   );
 
-  // Step 3: Personal Information (with Date of Birth and Gender side by side)
-  // Step 3: Personal Information (with Email and Phone side by side, Date of Birth and Gender side by side)
-const renderStep3 = () => (
-  <View style={styles.stepContainer}>
-    <Text style={styles.stepTitle}>Personal Information</Text>
-    
-    <View style={styles.row}>
-      <View style={styles.halfWidth}>
-        <InputField
-          label="First Name"
-          value={firstName}
-          onChangeText={setFirstName}
-          placeholder="Enter first name"
-          icon="person-outline"
-          required
-        />
+  // Step 3: Personal Information
+  const renderStep3 = () => (
+    <View style={styles.stepContainer}>
+      <Text style={styles.stepTitle}>Personal Information</Text>
+      
+      <View style={styles.row}>
+        <View style={styles.halfWidth}>
+          <InputField
+            label="First Name"
+            value={firstName}
+            onChangeText={setFirstName}
+            placeholder="Enter first name"
+            icon="person-outline"
+            required
+          />
+        </View>
+        <View style={styles.halfWidth}>
+          <InputField
+            label="Last Name"
+            value={lastName}
+            onChangeText={setLastName}
+            placeholder="Enter last name"
+            icon="person-outline"
+            required
+          />
+        </View>
       </View>
-      <View style={styles.halfWidth}>
-        <InputField
-          label="Last Name"
-          value={lastName}
-          onChangeText={setLastName}
-          placeholder="Enter last name"
-          icon="person-outline"
-          required
-        />
+      
+      {/* Email and Phone side by side */}
+      <View style={styles.row}>
+        <View style={styles.emailFieldWidth}>
+          <InputField
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="Enter email address"
+            icon="mail-outline"
+            keyboardType="email-address"
+          />
+        </View>
+        <View style={styles.phoneFieldWidth}>
+          <InputField
+            label="Phone"
+            value={phone}
+            onChangeText={setPhone}
+            placeholder="Enter phone number"
+            icon="call-outline"
+            keyboardType="phone-pad"
+          />
+        </View>
       </View>
+      
+      {/* Date of Birth and Gender side by side */}
+      <View style={styles.row}>
+        <View style={styles.dateFieldWidth}>
+          <InputField
+            label="Date of Birth"
+            value={dateOfBirth}
+            onChangeText={setDateOfBirth}
+            placeholder="MM/DD/YYYY"
+            icon="calendar-outline"
+          />
+        </View>
+        <View style={styles.genderFieldWidth}>
+          <SelectField
+            label="Gender"
+            value={gender}
+            onSelect={setGender}
+            options={[
+              { label: "Male", value: "male" },
+              { label: "Female", value: "female" },
+              { label: "Other", value: "other" },
+            ]}
+            icon="people-outline"
+          />
+        </View>
+      </View>
+      
+      <InputField
+        label="Address"
+        value={address}
+        onChangeText={setAddress}
+        placeholder="Enter address"
+        icon="location-outline"
+        multiline
+      />
     </View>
-    
-    {/* Email and Phone side by side */}
-    <View style={styles.row}>
-      <View style={styles.emailFieldWidth}>
-        <InputField
-          label="Email"
-          value={email}
-          onChangeText={setEmail}
-          placeholder="Enter email address"
-          icon="mail-outline"
-          keyboardType="email-address"
-        />
-      </View>
-      <View style={styles.phoneFieldWidth}>
-        <InputField
-          label="Phone"
-          value={phone}
-          onChangeText={setPhone}
-          placeholder="Enter phone number"
-          icon="call-outline"
-          keyboardType="phone-pad"
-        />
-      </View>
-    </View>
-    
-    {/* Date of Birth and Gender side by side */}
-    <View style={styles.row}>
-      <View style={styles.dateFieldWidth}>
-        <InputField
-          label="Date of Birth"
-          value={dateOfBirth}
-          onChangeText={setDateOfBirth}
-          placeholder="MM/DD/YYYY"
-          icon="calendar-outline"
-        />
-      </View>
-      <View style={styles.genderFieldWidth}>
-        <SelectField
-          label="Gender"
-          value={gender}
-          onSelect={setGender}
-          options={[
-            { label: "Male", value: "male" },
-            { label: "Female", value: "female" },
-            { label: "Other", value: "other" },
-          ]}
-          icon="people-outline"
-        />
-      </View>
-    </View>
-    
-    <InputField
-      label="Address"
-      value={address}
-      onChangeText={setAddress}
-      placeholder="Enter address"
-      icon="location-outline"
-      multiline
-    />
-  </View>
-);
+  );
 
   // Step 4: Academic Information
   const renderStep4 = () => (
@@ -405,8 +408,8 @@ const renderStep3 = () => (
     </View>
   );
 
-  const validateStep1 = () => true; // Account info is read-only, always valid
-  const validateStep2 = () => true; // Department selection is optional
+  const validateStep1 = () => true;
+  const validateStep2 = () => true;
   const validateStep3 = () => {
     if (!firstName.trim() || !lastName.trim()) {
       Alert.alert("Validation Error", "First name and last name are required");
@@ -501,7 +504,7 @@ const renderStep3 = () => (
           {currentStep === 3 && renderStep3()}
           {currentStep === 4 && renderStep4()}
           
-          {/* Buttons directly below the form - no spacing */}
+          {/* Buttons directly below the form */}
           <View style={styles.buttonContainer}>
             {currentStep > 1 && (
               <TouchableOpacity
@@ -640,8 +643,8 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 30,
-    paddingTop: 15, // Remove top padding
-    paddingBottom: 0, // Remove bottom padding
+    paddingTop: 15,
+    paddingBottom: 0,
   },
   stepContainer: {
     backgroundColor: COLORS.white,
@@ -701,18 +704,17 @@ const styles = StyleSheet.create({
   halfWidth: {
     flex: 1,
   },
-
   emailFieldWidth: {
-  flex: 0.5, // 50% width for email
-},
-phoneFieldWidth: {
-  flex: 0.5, // 50% width for phone
-},
+    flex: 0.5,
+  },
+  phoneFieldWidth: {
+    flex: 0.5,
+  },
   dateFieldWidth: {
-    flex: 0.4, // 40% width for date field
+    flex: 0.4,
   },
   genderFieldWidth: {
-    flex: 0.6, // 60% width for gender field
+    flex: 0.6,
   },
   optionsContainer: {
     flexDirection: "row",
@@ -783,9 +785,9 @@ phoneFieldWidth: {
   },
   buttonContainer: {
     flexDirection: "row",
-    padding: 0, // Remove padding
-    marginTop: 0, // Remove margin
-    marginBottom: 20, // Add some margin at the bottom for scroll
+    padding: 0,
+    marginTop: 0,
+    marginBottom: 20,
     backgroundColor: "transparent",
     gap: 12,
   },

@@ -6,6 +6,7 @@ import {
   isFirstLogin,
   removeTokens,
   removeUserData,
+  storeUserData,
 } from "../utils/storage";
 import { USER_ROLES } from "../utils/constants";
 
@@ -33,7 +34,6 @@ export const AuthProvider = ({ children }) => {
   const checkAuthStatus = async () => {
     try {
       setLoading(true);
-
       const token = await getAccessToken();
       const userData = await getUserData();
       const firstLogin = await isFirstLogin();
@@ -41,12 +41,10 @@ export const AuthProvider = ({ children }) => {
       if (token && userData) {
         // Verify token validity with backend
         const verifyResult = await authService.verifyToken();
-
         if (verifyResult.success) {
           setUser(userData);
           setRole(userData.role);
           setIsAuthenticated(true);
-
           if (firstLogin || userData.forcePasswordChange) {
             setRequiresPasswordChange(true);
           }
@@ -69,16 +67,13 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       const result = await authService.login(userId, password);
-
       if (result.success) {
         setUser(result.data.user);
         setRole(result.data.user.role);
         setIsAuthenticated(true);
-
         if (result.isFirstLogin) {
           setRequiresPasswordChange(true);
         }
-
         return { success: true, isFirstLogin: result.isFirstLogin };
       } else {
         return { success: false, message: result.message };
@@ -97,7 +92,6 @@ export const AuthProvider = ({ children }) => {
         currentPassword,
         newPassword,
       );
-
       if (result.success) {
         setRequiresPasswordChange(false);
         return { success: true, message: result.message };
@@ -114,12 +108,10 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       setLoading(true);
-      // Attempt to notify backend
       await authService.logout();
     } catch (error) {
       console.error("Logout API error:", error);
     } finally {
-      // Always clear local state regardless of API success
       await removeTokens();
       await removeUserData();
       resetAuthState();
@@ -127,15 +119,19 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const refreshUser = async () => {
+  // New function to refresh user profile
+  const refreshUserProfile = async () => {
     try {
       const result = await authService.getCurrentUser();
       if (result.success) {
         setUser(result.data);
         setRole(result.data.role);
+        await storeUserData(result.data);
+        return { success: true, data: result.data };
       }
-      return result;
+      return { success: false, message: result.message };
     } catch (error) {
+      console.error("Refresh profile error:", error);
       return { success: false, message: error.message };
     }
   };
@@ -164,7 +160,7 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     changePassword,
-    refreshUser,
+    refreshUserProfile,
     checkAuthStatus,
     hasRole,
     isAdmin,

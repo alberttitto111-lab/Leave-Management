@@ -454,13 +454,13 @@ const AppNavigator = () => {
             </>
           )}
 
-          {user?.role === USER_ROLES.STUDENT && (                                        /// just added this for testing, will remove later
+          {user?.role === USER_ROLES.STUDENT && (
             <>
               <Stack.Screen name="StudentMain" component={StudentTabs} />
-              <Stack.Screen 
-                name="EditStudentProfile" 
-                component={EditStudentProfileScreen} 
-                options={{ 
+              <Stack.Screen
+                name="EditStudentProfile"
+                component={EditStudentProfileScreen}
+                options={{
                   headerShown: false,
                 }}
               />

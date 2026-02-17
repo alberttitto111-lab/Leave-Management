@@ -25,7 +25,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 const { width } = Dimensions.get("window");
 
 const StudentDashboard = ({ navigation }) => {
-  const { user, logout, token } = useAuth();
+  const { user, logout, token, refreshUserProfile } = useAuth();
   const [stats, setStats] = useState({
     pendingLeaves: 0,
     approvedLeaves: 0,
@@ -50,6 +50,16 @@ const StudentDashboard = ({ navigation }) => {
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
 
+  // Listen for focus events to refresh profile data
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      refreshUserProfile();
+      fetchDashboardData();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
   const fetchDashboardData = useCallback(async () => {
     try {
       const response = await api.get("/student/dashboard-stats");
@@ -71,20 +81,8 @@ const StudentDashboard = ({ navigation }) => {
   const fetchLeaveTypes = useCallback(async () => {
     try {
       const response = await api.get("/student/leave-types");
-      console.log("Leave types API response:", response.data);
       const types = response.data.data || [];
       setLeaveTypes(types);
-
-      // Debug: Log each leave type ID
-      types.forEach((type, index) => {
-        console.log(`LeaveType ${index}:`, {
-          id: type._id,
-          idType: typeof type._id,
-          name: type.name,
-          applicableTo: type.applicableTo,
-          isActive: type.isActive,
-        });
-      });
     } catch (error) {
       console.error("Leave types fetch error:", error);
       Alert.alert("Error", "Failed to load leave types");
@@ -98,7 +96,11 @@ const StudentDashboard = ({ navigation }) => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchDashboardData();
+    await Promise.all([
+      refreshUserProfile(),
+      fetchDashboardData(),
+      fetchLeaveTypes()
+    ]);
     setRefreshing(false);
   };
 
@@ -136,52 +138,17 @@ const StudentDashboard = ({ navigation }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Function to optimistically update UI with new leave request
-  const optimisticallyAddLeaveRequest = (newLeaveRequest) => {
-    // Create a temporary leave object that matches the structure from API
-    const tempLeave = {
-      _id: newLeaveRequest._id || `temp-${Date.now()}`,
-      leaveType: newLeaveRequest.leaveType || leaveTypes.find(t => t._id === formData.leaveTypeId),
-      dateRange: {
-        from: formData.fromDate,
-        to: formData.toDate,
-        days: calculateDays(),
-      },
-      reason: formData.reason,
-      status: "pending",
-      finalStatus: "pending",
-      createdAt: new Date().toISOString(),
-    };
-
-    // Update recent leaves (add to beginning)
-    setRecentLeaves(prev => [tempLeave, ...prev].slice(0, 5)); // Keep only 5 most recent
-
-    // Update stats
-    setStats(prev => ({
-      ...prev,
-      pendingLeaves: prev.pendingLeaves + 1,
-      totalLeaves: prev.totalLeaves + 1,
-    }));
-  };
-
   const handleSubmitLeave = async () => {
     setErrors({});
 
-    console.log("Submitting with formData:", formData);
-    console.log("leaveTypeId value:", formData.leaveTypeId);
-    console.log("leaveTypeId type:", typeof formData.leaveTypeId);
-
     if (!validateForm()) {
-      console.log("Validation failed:", errors);
       return;
     }
 
     setSubmitting(true);
     
-    // Find the selected leave type for optimistic update
     const selectedLeaveType = leaveTypes.find(t => t._id === formData.leaveTypeId);
     
-    // Create optimistic leave request
     const optimisticLeave = {
       leaveType: selectedLeaveType,
       dateRange: {
@@ -195,9 +162,13 @@ const StudentDashboard = ({ navigation }) => {
     };
 
     // Optimistically update UI
-    optimisticallyAddLeaveRequest(optimisticLeave);
+    setRecentLeaves(prev => [optimisticLeave, ...prev].slice(0, 5));
+    setStats(prev => ({
+      ...prev,
+      pendingLeaves: prev.pendingLeaves + 1,
+      totalLeaves: prev.totalLeaves + 1,
+    }));
 
-    // Close modal immediately for better UX
     setModalVisible(false);
     resetForm();
 
@@ -211,42 +182,26 @@ const StudentDashboard = ({ navigation }) => {
         days: calculateDays(),
       };
 
-      console.log("Sending payload to API:", payload);
-
       const response = await api.post("/student/leave-request", payload);
-      console.log("API response:", response.data);
-
-      // If the API returns the actual created leave, replace the optimistic one
+      
       if (response.data?.data) {
         setRecentLeaves(prev => {
-          // Replace the optimistic entry with the real one
           const filtered = prev.filter(l => !l._id?.startsWith('temp-'));
           return [response.data.data, ...filtered].slice(0, 5);
         });
       }
 
-      // Show a subtle success message that auto-dismisses
       Alert.alert(
         "Success", 
         "Leave request submitted successfully",
-        [{ text: "OK", onPress: () => {} }],
+        [{ text: "OK" }],
         { cancelable: true }
       );
       
     } catch (error) {
       console.error("Submit error:", error);
-      console.error("Error response:", error.response?.data);
-
-      const errorMessage =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        error.message ||
-        "Failed to submit request";
-
-      // Revert optimistic update on error
-      fetchDashboardData(); // Refresh to get correct state
-      
-      Alert.alert("Error", errorMessage);
+      fetchDashboardData(); // Refresh to correct state
+      Alert.alert("Error", error.response?.data?.message || "Failed to submit request");
     } finally {
       setSubmitting(false);
     }
@@ -323,14 +278,22 @@ const StudentDashboard = ({ navigation }) => {
       color: "#662fdc",
     },
     {
-      title: "My Profile",
-      icon: "account-circle",
+      title: "Edit Profile",
+      icon: "account-edit",
       action: () => navigation.navigate("EditStudentProfile"),
-      color: COLORS.success,
+      color: "#45b15a",
     },
   ];
 
-  // Web-compatible Date Picker Component
+  // Get user's full name from context
+  const getFullName = () => {
+    if (user?.personalInfo) {
+      return `${user.personalInfo.firstName || ""} ${user.personalInfo.lastName || ""}`.trim();
+    }
+    return "Student";
+  };
+
+  // Date Picker Component
   const DatePickerField = ({ label, date, onChange, error }) => {
     const [showPicker, setShowPicker] = useState(false);
 
@@ -382,7 +345,6 @@ const StudentDashboard = ({ navigation }) => {
     );
   };
 
-  // Helper to safely get string ID from MongoDB ObjectId
   const getStringId = (id) => {
     if (!id) return "";
     if (typeof id === "string") return id;
@@ -400,11 +362,11 @@ const StudentDashboard = ({ navigation }) => {
           <View>
             <Text style={styles.greeting}>Welcome back,</Text>
             <Text style={styles.userName}>
-              {user?.personalInfo?.firstName || "Student"}
+              {getFullName()}
             </Text>
             <View style={styles.classBadge}>
               <Text style={styles.classText}>
-                Class {stats.class}-{stats.section}
+                Class {stats.class}-{stats.section} | Roll: {stats.rollNumber}
               </Text>
             </View>
           </View>
@@ -654,12 +616,6 @@ const StudentDashboard = ({ navigation }) => {
                           errors.leaveType && !isSelected && styles.inputError,
                         ]}
                         onPress={() => {
-                          console.log(
-                            "Selected leave type:",
-                            type.name,
-                            "ID:",
-                            typeId,
-                          );
                           setFormData({ ...formData, leaveTypeId: typeId });
                           setErrors({ ...errors, leaveType: null });
                         }}
@@ -720,22 +676,24 @@ const StudentDashboard = ({ navigation }) => {
                 />
               </View>
 
-              {/* Modified Half Day Leave - Now only checkbox is clickable */}
-              <View style={styles.halfDayContainer}>
-                <TouchableOpacity
+              <TouchableOpacity
+                style={styles.halfDayContainer}
+                onPress={() =>
+                  setFormData({ ...formData, halfDay: !formData.halfDay })
+                }
+              >
+                <View
                   style={[
                     styles.checkbox,
                     formData.halfDay && styles.checkboxActive,
                   ]}
-                  onPress={() => setFormData({ ...formData, halfDay: !formData.halfDay })}
-                  activeOpacity={0.7}
                 >
                   {formData.halfDay && (
                     <Icon name="check" size={16} color={COLORS.white} />
                   )}
-                </TouchableOpacity>
+                </View>
                 <Text style={styles.halfDayText}>Half Day Leave</Text>
-              </View>
+              </TouchableOpacity>
 
               <View style={styles.daysCalculation}>
                 <Text style={styles.daysLabel}>Total Days:</Text>
