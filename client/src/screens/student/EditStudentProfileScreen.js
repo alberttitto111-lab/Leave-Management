@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, memo } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,107 @@ import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { COLORS } from "../../utils/constants";
 import { useAuth } from "../../contexts/AuthContext";
+
+// Memoized Input Component to prevent re-renders
+const MemoizedInputField = memo(({ 
+  label, 
+  value, 
+  onChangeText, 
+  placeholder, 
+  icon, 
+  multiline, 
+  keyboardType, 
+  required, 
+  editable = true, 
+  disabledIcon = false,
+  saving = false 
+}) => {
+  const [localValue, setLocalValue] = useState(value);
+
+  // Sync local value with prop value when it changes externally
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  const handleChangeText = useCallback((text) => {
+    setLocalValue(text);
+    onChangeText(text);
+  }, [onChangeText]);
+
+  return (
+    <View style={styles.inputContainer}>
+      <View style={styles.labelContainer}>
+        <Text style={styles.label}>
+          {label} {required && <Text style={styles.required}>*</Text>}
+        </Text>
+        {disabledIcon && <Ionicons name="lock-closed" size={14} color={COLORS.slateLight} style={styles.disabledIcon} />}
+      </View>
+      <View style={[styles.inputWrapper, !editable && styles.inputWrapperDisabled]}>
+        <Ionicons name={icon} size={20} color={!editable ? COLORS.slateLight : COLORS.primary} style={styles.inputIcon} />
+        <TextInput
+          style={[styles.input, multiline && styles.textArea, !editable && styles.inputDisabled]}
+          value={localValue}
+          onChangeText={handleChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={COLORS.slateLight}
+          multiline={multiline}
+          keyboardType={keyboardType}
+          editable={editable && !saving}
+        />
+      </View>
+    </View>
+  );
+});
+
+// Memoized Select Component
+const MemoizedSelectField = memo(({
+  label,
+  value,
+  onSelect,
+  options,
+  required,
+  editable = true,
+  disabledIcon = false,
+}) => {
+  return (
+    <View style={styles.inputContainer}>
+      <View style={styles.labelContainer}>
+        <Text style={styles.label}>
+          {label} {required && <Text style={styles.required}>*</Text>}
+        </Text>
+        {disabledIcon && <Ionicons name="lock-closed" size={14} color={COLORS.slateLight} style={styles.disabledIcon} />}
+      </View>
+      <View style={[styles.optionsContainer, !editable && styles.optionsContainerDisabled]}>
+        {options.map((option) => (
+          <TouchableOpacity
+            key={option.value}
+            style={[
+              styles.optionButton,
+              value === option.value && styles.optionButtonSelected,
+              !editable && styles.optionButtonDisabled,
+            ]}
+            onPress={() => {
+              if (editable) {
+                onSelect(option.value);
+              }
+            }}
+            disabled={!editable}
+          >
+            <Text
+              style={[
+                styles.optionText,
+                value === option.value && styles.optionTextSelected,
+                !editable && styles.optionTextDisabled,
+              ]}
+            >
+              {option.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+});
 
 const EditStudentProfileScreen = ({ navigation }) => {
   const { user, refreshUserProfile } = useAuth();
@@ -72,7 +173,6 @@ const EditStudentProfileScreen = ({ navigation }) => {
       const data = response.data.data || response.data;
       
       setProfile(data);
-      console.log("Profile data:", JSON.stringify(data, null, 2));
       
       // Basic Info
       setUserId(data.userId || "");
@@ -109,6 +209,37 @@ const EditStudentProfileScreen = ({ navigation }) => {
     }
   };
 
+  // Use useCallback to prevent function recreation on every render
+  const handleFirstNameChange = useCallback((text) => {
+    setFirstName(text);
+    setIsUpdated(false);
+  }, []);
+
+  const handleLastNameChange = useCallback((text) => {
+    setLastName(text);
+    setIsUpdated(false);
+  }, []);
+
+  const handleEmailChange = useCallback((text) => {
+    setEmail(text);
+    setIsUpdated(false);
+  }, []);
+
+  const handlePhoneChange = useCallback((text) => {
+    setPhone(text);
+    setIsUpdated(false);
+  }, []);
+
+  const handleAddressChange = useCallback((text) => {
+    setAddress(text);
+    setIsUpdated(false);
+  }, []);
+
+  const handleGenderChange = useCallback((value) => {
+    setGender(value);
+    setIsUpdated(false);
+  }, []);
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -126,14 +257,10 @@ const EditStudentProfileScreen = ({ navigation }) => {
         departmentId: departmentId || null,
       };
 
-      console.log("Saving payload:", payload);
-
       const response = await api.patch(`/student/profile`, payload);
       
       if (response.data?.success) {
         setIsUpdated(true);
-        
-        // Refresh the user profile in AuthContext
         await refreshUserProfile();
         
         Alert.alert("Success", "Profile updated successfully", [
@@ -151,76 +278,8 @@ const EditStudentProfileScreen = ({ navigation }) => {
     }
   };
 
-  const InputField = ({ label, value, onChangeText, placeholder, icon, multiline, keyboardType, required, containerStyle, editable = true, disabledIcon = false }) => (
-    <View style={[styles.inputContainer, containerStyle]}>
-      <View style={styles.labelContainer}>
-        <Text style={styles.label}>
-          {label} {required && <Text style={styles.required}>*</Text>}
-        </Text>
-        {disabledIcon && <Ionicons name="lock-closed" size={14} color={COLORS.slateLight} style={styles.disabledIcon} />}
-      </View>
-      <View style={[styles.inputWrapper, !editable && styles.inputWrapperDisabled]}>
-        <Ionicons name={icon} size={20} color={!editable ? COLORS.slateLight : COLORS.primary} style={styles.inputIcon} />
-        <TextInput
-          style={[styles.input, multiline && styles.textArea, !editable && styles.inputDisabled]}
-          value={value}
-          onChangeText={(text) => {
-            onChangeText(text);
-            setIsUpdated(false);
-          }}
-          placeholder={placeholder}
-          placeholderTextColor={COLORS.slateLight}
-          multiline={multiline}
-          keyboardType={keyboardType}
-          editable={editable && !saving}
-        />
-      </View>
-    </View>
-  );
-
-  const SelectField = ({ label, value, onSelect, options, icon, required, containerStyle, editable = true, disabledIcon = false }) => (
-    <View style={[styles.inputContainer, containerStyle]}>
-      <View style={styles.labelContainer}>
-        <Text style={styles.label}>
-          {label} {required && <Text style={styles.required}>*</Text>}
-        </Text>
-        {disabledIcon && <Ionicons name="lock-closed" size={14} color={COLORS.slateLight} style={styles.disabledIcon} />}
-      </View>
-      <View style={[styles.optionsContainer, !editable && styles.optionsContainerDisabled]}>
-        {options.map((option) => (
-          <TouchableOpacity
-            key={option.value}
-            style={[
-              styles.optionButton,
-              value === option.value && styles.optionButtonSelected,
-              !editable && styles.optionButtonDisabled,
-            ]}
-            onPress={() => {
-              if (editable) {
-                onSelect(option.value);
-                setIsUpdated(false);
-              }
-            }}
-            disabled={!editable}
-          >
-            <Text
-              style={[
-                styles.optionText,
-                value === option.value && styles.optionTextSelected,
-                !editable && styles.optionTextDisabled,
-              ]}
-            >
-              {option.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-
-  const DepartmentSelector = () => (
+  const DepartmentSelector = useCallback(() => (
     <View style={styles.inputContainer}>
-      {/* <Text style={styles.label}>Department</Text> */}
       <View style={styles.departmentsContainer}>
         {departments.map((dept) => (
           <TouchableOpacity
@@ -246,7 +305,7 @@ const EditStudentProfileScreen = ({ navigation }) => {
         ))}
       </View>
     </View>
-  );
+  ), [departments, departmentId]);
 
   const InfoRow = ({ label, value }) => (
     <View style={styles.infoRow}>
@@ -275,100 +334,103 @@ const EditStudentProfileScreen = ({ navigation }) => {
     </View>
   );
 
-  // Step 3: Personal Information (with disabled Date of Birth and Gender)
+  // Step 3: Personal Information
   const renderStep3 = () => (
     <View style={styles.stepContainer}>
       <Text style={styles.stepTitle}>Personal Information</Text>
       
       <View style={styles.row}>
         <View style={styles.halfWidth}>
-          <InputField
+          <MemoizedInputField
             label="First Name"
             value={firstName}
-            onChangeText={setFirstName}
+            onChangeText={handleFirstNameChange}
             placeholder="Enter first name"
             icon="person-outline"
             required
+            saving={saving}
           />
         </View>
         <View style={styles.halfWidth}>
-          <InputField
+          <MemoizedInputField
             label="Last Name"
             value={lastName}
-            onChangeText={setLastName}
+            onChangeText={handleLastNameChange}
             placeholder="Enter last name"
             icon="person-outline"
             required
+            saving={saving}
           />
         </View>
       </View>
       
-      {/* Email and Phone side by side */}
       <View style={styles.row}>
         <View style={styles.emailFieldWidth}>
-          <InputField
+          <MemoizedInputField
             label="Email"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={handleEmailChange}
             placeholder="Enter email address"
             icon="mail-outline"
             keyboardType="email-address"
+            saving={saving}
           />
         </View>
         <View style={styles.phoneFieldWidth}>
-          <InputField
+          <MemoizedInputField
             label="Phone"
             value={phone}
-            onChangeText={setPhone}
+            onChangeText={handlePhoneChange}
             placeholder="Enter phone number"
             icon="call-outline"
             keyboardType="phone-pad"
+            saving={saving}
           />
         </View>
       </View>
       
-      {/* Date of Birth and Gender side by side - DISABLED with lock icons */}
       <View style={styles.row}>
         <View style={styles.dateFieldWidth}>
-          <InputField
+          <MemoizedInputField
             label="Date of Birth"
             value={dateOfBirth}
-            onChangeText={setDateOfBirth}
+            onChangeText={() => {}}
             placeholder="MM/DD/YYYY"
             icon="calendar-outline"
             editable={false}
             disabledIcon={true}
+            saving={saving}
           />
         </View>
         <View style={styles.genderFieldWidth}>
-          <SelectField
+          <MemoizedSelectField
             label="Gender"
             value={gender}
-            onSelect={setGender}
+            onSelect={handleGenderChange}
             options={[
               { label: "Male", value: "male" },
               { label: "Female", value: "female" },
               { label: "Other", value: "other" },
             ]}
-            icon="people-outline"
             editable={false}
             disabledIcon={true}
           />
         </View>
       </View>
       
-      <InputField
+      <MemoizedInputField
         label="Address"
         value={address}
-        onChangeText={setAddress}
+        onChangeText={handleAddressChange}
         placeholder="Enter address"
         icon="location-outline"
         multiline
+        saving={saving}
       />
     </View>
   );
 
-  // Step 4: Academic Information (Now Read-only)
+  // Step 4: Academic Information
   const renderStep4 = () => (
     <View style={styles.stepContainer}>
       <Text style={styles.stepTitle}>Academic Information</Text>
@@ -379,8 +441,6 @@ const EditStudentProfileScreen = ({ navigation }) => {
     </View>
   );
 
-  const validateStep1 = () => true;
-  const validateStep2 = () => true;
   const validateStep3 = () => {
     if (!firstName.trim() || !lastName.trim()) {
       Alert.alert("Validation Error", "First name and last name are required");
@@ -388,7 +448,6 @@ const EditStudentProfileScreen = ({ navigation }) => {
     }
     return true;
   };
-  const validateStep4 = () => true; // Academic info is read-only, always valid
 
   if (loading) {
     return (
@@ -402,7 +461,6 @@ const EditStudentProfileScreen = ({ navigation }) => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       
-      {/* Header */}
       <View style={[styles.header, { backgroundColor: COLORS.primary }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
@@ -411,7 +469,6 @@ const EditStudentProfileScreen = ({ navigation }) => {
         <View style={{ width: 40 }} />
       </View>
 
-      {/* Progress Steps */}
       <View style={styles.progressContainer}>
         {[1, 2, 3, 4].map((step) => (
           <View key={step} style={styles.progressStep}>
@@ -444,7 +501,6 @@ const EditStudentProfileScreen = ({ navigation }) => {
         ))}
       </View>
 
-      {/* Step Labels */}
       <View style={styles.stepLabels}>
         <Text style={[styles.stepLabel, currentStep === 1 && styles.stepLabelActive]}>Account</Text>
         <Text style={[styles.stepLabel, currentStep === 2 && styles.stepLabelActive]}>Dept</Text>
@@ -463,13 +519,13 @@ const EditStudentProfileScreen = ({ navigation }) => {
           showsVerticalScrollIndicator={true}
           persistentScrollbar={true}
           indicatorStyle="black"
+          keyboardShouldPersistTaps="handled"
         >
           {currentStep === 1 && renderStep1()}
           {currentStep === 2 && renderStep2()}
           {currentStep === 3 && renderStep3()}
           {currentStep === 4 && renderStep4()}
           
-          {/* Buttons directly below the form */}
           <View style={styles.buttonContainer}>
             {currentStep > 1 && (
               <TouchableOpacity
