@@ -7,7 +7,6 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  FlatList,
   Alert,
   ActivityIndicator,
 } from "react-native";
@@ -15,11 +14,9 @@ import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { useAuth } from "../../contexts/AuthContext";
 
-const StatCard = ({ icon, title, value, color, onPress }) => (
-  <TouchableOpacity
-    style={[styles.statCard, { borderLeftColor: color }]}
-    onPress={onPress}
-  >
+// Modified StatCard - removed onPress to disable clickability
+const StatCard = ({ icon, title, value, color }) => (
+  <View style={[styles.statCard, { borderLeftColor: color }]}>
     <View style={[styles.iconContainer, { backgroundColor: color + "20" }]}>
       <Ionicons name={icon} size={24} color={color} />
     </View>
@@ -27,7 +24,7 @@ const StatCard = ({ icon, title, value, color, onPress }) => (
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statTitle}>{title}</Text>
     </View>
-  </TouchableOpacity>
+  </View>
 );
 
 // Modified LeaveCard for horizontal design - removed buttons
@@ -113,7 +110,8 @@ const TeacherDashboard = ({ navigation }) => {
   const [stats, setStats] = useState({
     totalStudents: 0,
     pendingLeaves: 0,
-    todayAbsents: 0,
+    approvedLeaves: 0,
+    rejectedLeaves: 0,
     assignedClasses: [],
     subjects: [],
     isClassTeacher: false,
@@ -125,26 +123,54 @@ const TeacherDashboard = ({ navigation }) => {
     loadDashboardData();
   }, []);
 
-const loadDashboardData = useCallback(async () => {
-  try {
-    setLoading(true);
-    const [statsRes, leavesRes, profileRes] = await Promise.all([
-      api.get("/teacher/dashboard-stats"),
-      api.get("/teacher/leave-requests"),
-      api.get("/teacher/profile"),
-    ]);
-    
-    setStats(statsRes.data.data);
-    setPendingLeaves(leavesRes.data.data);
-    setProfile(profileRes.data.data);
-  } catch (error) {
-    console.error("Dashboard load error:", error);
-    Alert.alert("Error", "Failed to load dashboard data");
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-  }
-}, []);
+  const loadDashboardData = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch dashboard stats
+      const statsRes = await api.get("/teacher/dashboard-stats");
+      console.log("Stats response:", statsRes.data);
+      
+      // Fetch pending leaves
+      const leavesRes = await api.get("/teacher/leave-requests");
+      console.log("Leaves response:", leavesRes.data);
+      
+      // Fetch profile
+      const profileRes = await api.get("/teacher/profile");
+      
+      // Calculate approved and rejected leaves from the leaves data
+      const allLeaves = leavesRes.data.data || [];
+      const approvedLeaves = allLeaves.filter(
+        leave => leave.status === "approved" || 
+                leave.status === "approved_by_teacher" || 
+                leave.status === "approved_by_hod" || 
+                leave.finalStatus === "approved"
+      ).length;
+      
+      const rejectedLeaves = allLeaves.filter(
+        leave => leave.status === "rejected" || leave.finalStatus === "rejected"
+      ).length;
+      
+      setStats({
+        ...statsRes.data.data,
+        approvedLeaves: approvedLeaves,
+        rejectedLeaves: rejectedLeaves,
+        totalStudents: statsRes.data.data?.totalStudents || 0,
+        pendingLeaves: statsRes.data.data?.pendingLeaves || 0,
+      });
+      
+      setPendingLeaves(allLeaves.filter(leave => 
+        leave.status === "pending" || leave.status === "approved_by_teacher"
+      ));
+      setProfile(profileRes.data.data);
+    } catch (error) {
+      console.error("Dashboard load error:", error);
+      Alert.alert("Error", "Failed to load dashboard data");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -286,47 +312,47 @@ const loadDashboardData = useCallback(async () => {
         </View>
       </View>
 
-      {/* Stats Grid */}
+      {/* Stats Grid - All non-clickable now */}
       <View style={styles.statsGrid}>
         <StatCard
           icon="people"
           title="My Students"
           value={stats.totalStudents}
           color="#0D9488"
-          onPress={navigateToStudents}
         />
         <StatCard
           icon="time"
-          title="Pending Leaves"
+          title="Pending"
           value={stats.pendingLeaves}
           color="#F59E0B"
-          onPress={navigateToLeaveRequests}
         />
         <StatCard
           icon="checkmark-circle"
           title="Approved"
-          value={stats.approvedLeaves || 0}
+          value={stats.approvedLeaves}
           color="#10B981"
-          onPress={navigateToLeaveHistory}
         />
         <StatCard
-          icon="calendar"
-          title="My Classes"
-          value={stats.assignedClasses?.length || 0}
-          color="#3B82F6"
-          onPress={() => {}}
+          icon="close-circle"
+          title="Rejected"
+          value={stats.rejectedLeaves}
+          color="#EF4444"
         />
       </View>
 
-      {/* Assigned Classes */}
+      {/* Assigned Classes - This one remains clickable if needed */}
       {stats.assignedClasses?.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>My Classes</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {stats.assignedClasses.map((cls, index) => (
-              <View key={index} style={styles.classChip}>
+              <TouchableOpacity 
+                key={index} 
+                style={styles.classChip}
+                onPress={() => {}} // Add navigation if needed
+              >
                 <Text style={styles.classChipText}>Class {cls}</Text>
-              </View>
+              </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
@@ -411,7 +437,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   header: {
-    backgroundColor: "#0D9488", // Teal color for header
+    backgroundColor: "#0D9488",
     paddingTop: 40,
     paddingBottom: 30,
     borderBottomLeftRadius: 30,
@@ -628,91 +654,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: "#64748B",
   },
-  leaveCard: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  leaveHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 12,
-  },
-  studentInfo: {
-    flex: 1,
-  },
-  studentName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1E293B",
-    marginBottom: 2,
-  },
-  studentId: {
-    fontSize: 12,
-    color: "#64748B",
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "600",
-    textTransform: "capitalize",
-  },
-  leaveDetails: {
-    marginBottom: 12,
-  },
-  detailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  detailLabel: {
-    fontSize: 13,
-    color: "#64748B",
-    marginLeft: 6,
-    width: 60,
-  },
-  detailValue: {
-    flex: 1,
-    fontSize: 13,
-    color: "#1E293B",
-    fontWeight: "500",
-  },
-  leaveActions: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  actionBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    borderRadius: 10,
-    gap: 6,
-  },
-  approveBtn: {
-    backgroundColor: "#10B981",
-  },
-  rejectBtn: {
-    backgroundColor: "#EF4444",
-  },
-  actionBtnText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 14,
-  },
   quickActions: {
     flexDirection: "row",
     gap: 12,
@@ -744,6 +685,24 @@ const styles = StyleSheet.create({
     color: "#475569",
     fontWeight: "600",
     textAlign: "center",
+  },
+  // Keep these for reference but they're not used in the new design
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  detailLabel: {
+    fontSize: 13,
+    color: "#64748B",
+    marginLeft: 6,
+    width: 60,
+  },
+  detailValue: {
+    flex: 1,
+    fontSize: 13,
+    color: "#1E293B",
+    fontWeight: "500",
   },
 });
 
