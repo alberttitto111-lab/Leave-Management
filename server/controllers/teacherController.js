@@ -279,23 +279,56 @@ export const rejectLeave = asyncHandler(async (req, res) => {
     });
 });
 
-// @desc    Get teacher profile
-// @route   GET /api/teacher/profile
-// @access  Private/Teacher
+// @desc Get teacher profile
+// @route GET /api/teacher/profile
+// @access Private/Teacher
 export const getProfile = asyncHandler(async (req, res) => {
-    const teacher = await User.findById(req.user.id).select("-password");
-
-    if (!teacher) {
-        res.status(404);
-        throw new Error("Teacher not found");
-    }
-
-    res.json({
-        success: true,
-        data: teacher,
-    });
+  const teacher = await User.findById(req.user.id)
+    .select("-password")
+    .populate("departmentId", "name code");
+  
+  if (!teacher) {
+    res.status(404);
+    throw new Error("Teacher not found");
+  }
+  
+  res.json({
+    success: true,
+    data: teacher,
+  });
 });
 
+// @desc Update teacher profile
+// @route PATCH /api/teacher/profile
+// @access Private/Teacher
+export const updateProfile = asyncHandler(async (req, res) => {
+  const teacher = await User.findById(req.user.id);
+  
+  if (!teacher) {
+    res.status(404);
+    throw new Error("Teacher not found");
+  }
+  
+  const { personalInfo } = req.body;
+  
+  // Update personal information if provided
+  if (personalInfo) {
+    teacher.personalInfo = {
+      ...teacher.personalInfo,
+      ...personalInfo,
+    };
+  }
+  
+  await teacher.save();
+  
+  res.json({
+    success: true,
+    message: "Profile updated successfully",
+    data: teacher,
+  });
+});
+
+// STUDENT MANAGEMENT 
 // @desc    Get students
 // @route   GET /api/teacher/students
 // @access  Private/Teacher

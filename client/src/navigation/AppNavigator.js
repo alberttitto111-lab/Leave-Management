@@ -423,7 +423,7 @@ const AppNavigator = () => {
                 name="TeacherProfile"
                 component={TeacherProfile}
                 options={{
-                  headerShown: true,
+                  headerShown: false,
                   title: "Profile",
                   headerStyle: { backgroundColor: "#0D9488" },
                   headerTintColor: "#fff",

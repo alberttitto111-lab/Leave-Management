@@ -22,19 +22,19 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-
+    
     // Only set JSON Content-Type if NOT FormData
     if (!(config.data instanceof FormData)) {
       config.headers["Content-Type"] = "application/json";
     }
-
+    
     // Prevent caching issues
     config.params = {
       ...config.params,
       _t: Date.now(),
     };
-
-    console.log("API Request:", config.method?.toUpperCase(), config.url); // DEBUG
+    
+    console.log("API Request:", config.method?.toUpperCase(), config.url);
     return config;
   },
   (error) => Promise.reject(error),
@@ -43,30 +43,28 @@ api.interceptors.request.use(
 // RESPONSE INTERCEPTOR: handle 401 (refresh token)
 api.interceptors.response.use(
   (response) => {
-    console.log("API Response:", response.status, response.config.url); // DEBUG
+    console.log("API Response:", response.status, response.config.url);
     return response;
   },
   async (error) => {
-    console.error("API Error:", error.response?.status, error.message); // DEBUG
-
+    console.error("API Error:", error.response?.status, error.message);
     const originalRequest = error.config;
-
+    
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-
       try {
         const refreshToken = await getRefreshToken();
         if (!refreshToken) throw new Error("No refresh token");
-
+        
         const response = await axios.post(
           `${API_BASE_URL}/auth/refresh-token`,
           { refreshToken },
         );
-
+        
         const { accessToken, refreshToken: newRefreshToken } =
           response.data.data;
+        
         await storeTokens(accessToken, newRefreshToken);
-
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
@@ -75,15 +73,15 @@ api.interceptors.response.use(
         return Promise.reject(refreshError);
       }
     }
-
+    
     if (!error.response) {
       error.message = MESSAGES.NETWORK_ERROR;
     }
-
+    
     if (error.response?.status === 403) {
       error.message = MESSAGES.UNAUTHORIZED;
     }
-
+    
     return Promise.reject(error);
   },
 );

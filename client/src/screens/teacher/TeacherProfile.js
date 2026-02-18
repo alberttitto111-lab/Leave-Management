@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
-  Image,
   Platform,
   StatusBar,
   Alert,
@@ -15,26 +14,24 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
-// --- FIX: Import Expo Image Picker ---
-import * as ImagePicker from "expo-image-picker";
 import { getAccessToken } from "../../utils/storage";
 import { API_BASE_URL } from "../../utils/constants";
 
-const HEADER_HEIGHT = 260;
+const HEADER_HEIGHT = 120;
 
-const TeacherProfile = () => {
+const TeacherProfile = ({ navigation }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
 
-  // Form States - Unified for both nested objects
-  const [bio, setBio] = useState("");
-  const [qualification, setQualification] = useState("");
-  const [experience, setExperience] = useState("");
-  const [specialization, setSpecialization] = useState("");
+  // Form States - Personal Information
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [gender, setGender] = useState("");
   const [address, setAddress] = useState("");
 
   const loadProfile = useCallback(async () => {
@@ -47,16 +44,14 @@ const TeacherProfile = () => {
 
       setProfile(data);
 
-      const profDetails = data.professionalDetails || {};
       const personalInfo = data.personalInfo || {};
 
-      setBio(profDetails.bio || "");
-      setQualification(profDetails.qualification || "");
-      setExperience(profDetails.experience || "");
-      setSpecialization(profDetails.specialization || "");
-
+      setFirstName(personalInfo.firstName || "");
+      setLastName(personalInfo.lastName || "");
       setEmail(personalInfo.email || "");
       setPhone(personalInfo.phone || "");
+      setDateOfBirth(personalInfo.dateOfBirth || "");
+      setGender(personalInfo.gender || "");
       setAddress(personalInfo.address || "");
     } catch (e) {
       console.error("Load profile error:", e);
@@ -70,118 +65,74 @@ const TeacherProfile = () => {
     loadProfile();
   }, [loadProfile]);
 
-  // --- FIX: Updated Photo Handler for Expo ---
-  const handleCameraPress = async () => {
-    // 1. Request Permission
-    const permissionResult =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
+const saveProfile = async () => {
+  try {
+    setSaving(true);
+    
+    // Prepare the update data
+    const updateData = {
+      personalInfo: {
+        firstName,
+        lastName,
+        email,
+        phone,
+        dateOfBirth,
+        gender,
+        address,
+      }
+    };
 
-    if (permissionResult.granted === false) {
+    console.log("Saving profile data:", updateData);
+
+    const response = await api.patch("/teacher/profile", updateData);
+
+    if (response.data.success && response.data.data) {
+      setProfile(response.data.data);
+      setEditing(false);
+      
+      // Show a brief success message then navigate
       Alert.alert(
-        "Permission Required",
-        "You need to allow access to photos to update your profile picture.",
+        "Success", 
+        "Profile updated successfully",
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              // Navigate to Dashboard
+              navigation.navigate("TeacherDashboard");
+            }
+          }
+        ]
       );
-      return;
+    } else {
+      throw new Error(response.data.message || "Update failed");
     }
+  } catch (e) {
+    console.error("Save profile error:", e);
+    Alert.alert(
+      "Error",
+      e.response?.data?.message || e.message || "Update failed",
+    );
+  } finally {
+    setSaving(false);
+  }
+};
 
-    // 2. Open Library
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.5,
-    });
-
-    if (!result.canceled) {
-      await uploadPhoto(result.assets[0]);
-    }
+  const handleBackPress = () => {
+    navigation.goBack(); // This will go back to the previous screen (TeacherDashboard)
   };
 
-  // TeacherProfile.js
-
-  const uploadPhoto = async (file) => {
-    try {
-      setLoading(true);
-
-      const formData = new FormData();
-
-      // 1. Format the file correctly for FormData
-      const uri =
-        Platform.OS === "ios" ? file.uri.replace("file://", "") : file.uri;
-      const filename = file.fileName || uri.split("/").pop();
-      const type = file.mimeType || `image/${filename.split(".").pop()}`;
-
-      formData.append("profilePicture", {
-        uri: uri,
-        type: type,
-        name: filename,
-      });
-
-      console.log("Sending FormData with fetch:", formData);
-
-      // 2. Use fetch API
-      // --- FIX: Access Token from your storage utility ---
-      const token = await getAccessToken(); // Import this from your storage utils
-
-      // --- FIX: API Base URL ---
-      const response = await fetch(
-        `${API_BASE_URL}/teacher/profile/upload-photo`,
-        {
-          method: "POST",
-          body: formData,
-          headers: {
-            // --- CRUCIAL: Do NOT set Content-Type header ---
-            // Fetch will set it automatically with the boundary
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      const result = await response.json();
-
-      if (response.ok && result.success) {
-        setProfile(result.data);
-        Alert.alert("Success", "Photo updated successfully");
-      } else {
-        throw new Error(result.message || "Upload failed");
-      }
-    } catch (e) {
-      console.error("Photo upload error:", e);
-      Alert.alert("Error", e.message || "Failed to upload photo");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const saveProfile = async () => {
-    try {
-      setSaving(true);
-      const updateData = {
-        "professionalDetails.bio": bio,
-        "professionalDetails.qualification": qualification,
-        "professionalDetails.experience": experience,
-        "professionalDetails.specialization": specialization,
-        "personalInfo.email": email,
-        "personalInfo.phone": phone,
-        "personalInfo.address": address,
-      };
-
-      const response = await api.patch("/teacher/profile", updateData);
-
-      if (response.data.data) {
-        setProfile(response.data.data);
-        setEditing(false);
-        Alert.alert("Success", "Profile updated successfully");
-      }
-    } catch (e) {
-      console.error("Save profile error:", e);
-      Alert.alert(
-        "Error",
-        e.response?.data?.message || e.message || "Update failed",
-      );
-    } finally {
-      setSaving(false);
-    }
+  const cancelEdit = () => {
+    // Reset form to original profile values
+    const personalInfo = profile?.personalInfo || {};
+    setFirstName(personalInfo.firstName || "");
+    setLastName(personalInfo.lastName || "");
+    setEmail(personalInfo.email || "");
+    setPhone(personalInfo.phone || "");
+    setDateOfBirth(personalInfo.dateOfBirth || "");
+    setGender(personalInfo.gender || "");
+    setAddress(personalInfo.address || "");
+    setEditing(false);
   };
 
   if (loading) {
@@ -196,69 +147,41 @@ const TeacherProfile = () => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#7C3AED" />
 
-      {/* Fixed Header */}
-      <View style={styles.header}>
-        <View style={styles.photoContainer}>
-          {profile?.personalInfo?.profilePicture ? (
-            // TeacherProfile.js (JSX)
-
-            <Image
-              source={{
-                uri: profile?.personalInfo?.profilePicture
-                  ? `${API_BASE_URL.replace("/api", "")}${profile.personalInfo.profilePicture}`
-                  : "https://via.placeholder.com/150",
-              }}
-              style={styles.profilePhoto}
-            />
-          ) : (
-            <View style={[styles.profilePhoto, styles.placeholderPhoto]}>
-              <Text style={styles.placeholderText}>
-                {profile?.personalInfo?.firstName?.[0] || "T"}
-                {profile?.personalInfo?.lastName?.[0] || "P"}
-              </Text>
-            </View>
-          )}
-          {/* --- FIX: Attach handler here --- */}
+      {/* Fixed Header with Back Button */}
+      <View style={[styles.header, { backgroundColor: "#7C3AED" }]}>
+        <View style={styles.headerTop}>
           <TouchableOpacity
-            style={styles.cameraBtn}
-            onPress={handleCameraPress}
+            onPress={handleBackPress}
+            style={styles.backButton}
           >
-            <Ionicons name="camera" size={18} color="#fff" />
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>Teacher Profile</Text>
+            <Text style={styles.headerSubtitle}>
+              {firstName || ""} {lastName || ""}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => {
+              if (editing) {
+                cancelEdit();
+              } else {
+                setEditing(true);
+              }
+            }}
+          >
+            <Ionicons
+              name={editing ? "close-outline" : "create-outline"}
+              size={20}
+              color="#fff"
+            />
+            <Text style={styles.editButtonText}>
+              {editing ? "Cancel" : "Edit"}
+            </Text>
           </TouchableOpacity>
         </View>
-
-        <Text style={styles.name}>
-          {profile?.personalInfo?.firstName} {profile?.personalInfo?.lastName}
-        </Text>
-
-        <Text style={styles.role}>{profile?.role?.toUpperCase()}</Text>
-
-        <TouchableOpacity
-          style={styles.editBtn}
-          onPress={() => {
-            if (editing) {
-              const currentProf = profile?.professionalDetails || {};
-              const currentPersonal = profile?.personalInfo || {};
-              setBio(currentProf.bio || "");
-              setQualification(currentProf.qualification || "");
-              setExperience(currentProf.experience || "");
-              setSpecialization(currentProf.specialization || "");
-              setEmail(currentPersonal.email || "");
-              setPhone(currentPersonal.phone || "");
-              setAddress(currentPersonal.address || "");
-            }
-            setEditing((p) => !p);
-          }}
-        >
-          <Ionicons
-            name={editing ? "close-outline" : "create-outline"}
-            size={16}
-            color="#7C3AED"
-          />
-          <Text style={styles.editText}>
-            {editing ? "Cancel" : "Edit Profile"}
-          </Text>
-        </TouchableOpacity>
       </View>
 
       {/* Scroll Area */}
@@ -271,59 +194,79 @@ const TeacherProfile = () => {
           style={StyleSheet.absoluteFill}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+          showsVerticalScrollIndicator={true}
+          persistentScrollbar={true}
+          indicatorStyle="black"
           keyboardDismissMode="on-drag"
         >
           <View style={{ height: HEADER_HEIGHT + 10 }} />
 
-          {/* Professional Details */}
+          {/* Personal Information */}
           <Card>
-            <SectionTitle title="Professional Details" />
-            <Field
-              label="Bio"
-              value={bio}
-              onChangeText={setBio}
-              editing={editing}
-              multiline
-            />
-            <Field
-              label="Qualification"
-              value={qualification}
-              onChangeText={setQualification}
-              editing={editing}
-            />
-            <Field
-              label="Experience"
-              value={experience}
-              onChangeText={setExperience}
-              editing={editing}
-            />
-            <Field
-              label="Specialization"
-              value={specialization}
-              onChangeText={setSpecialization}
-              editing={editing}
-            />
-          </Card>
+            <SectionTitle title="Personal Information" />
+            
+            <View style={styles.row}>
+              <View style={styles.halfWidth}>
+                <Field
+                  label="First Name"
+                  value={firstName}
+                  onChangeText={setFirstName}
+                  editing={editing}
+                />
+              </View>
+              <View style={styles.halfWidth}>
+                <Field
+                  label="Last Name"
+                  value={lastName}
+                  onChangeText={setLastName}
+                  editing={editing}
+                />
+              </View>
+            </View>
 
-          {/* Contact Information */}
-          <Card>
-            <SectionTitle title="Contact Information" />
-            <Field
-              label="Email"
-              value={email}
-              onChangeText={setEmail}
-              editing={editing}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-            <Field
-              label="Phone"
-              value={phone}
-              onChangeText={setPhone}
-              editing={editing}
-              keyboardType="phone-pad"
-            />
+            <View style={styles.row}>
+              <View style={styles.emailFieldWidth}>
+                <Field
+                  label="Email"
+                  value={email}
+                  onChangeText={setEmail}
+                  editing={editing}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+              <View style={styles.phoneFieldWidth}>
+                <Field
+                  label="Phone"
+                  value={phone}
+                  onChangeText={setPhone}
+                  editing={editing}
+                  keyboardType="phone-pad"
+                />
+              </View>
+            </View>
+
+            <View style={styles.row}>
+              <View style={styles.dateFieldWidth}>
+                <Field
+                  label="Date of Birth"
+                  value={dateOfBirth}
+                  onChangeText={setDateOfBirth}
+                  editing={editing}
+                  placeholder="YYYY-MM-DD"
+                />
+              </View>
+              <View style={styles.genderFieldWidth}>
+                <Field
+                  label="Gender"
+                  value={gender}
+                  onChangeText={setGender}
+                  editing={editing}
+                  placeholder="Male/Female/Other"
+                />
+              </View>
+            </View>
+
             <Field
               label="Address"
               value={address}
@@ -386,6 +329,7 @@ const Field = ({
   multiline,
   keyboardType,
   autoCapitalize,
+  placeholder,
 }) => (
   <View style={{ marginBottom: 14 }}>
     <Text style={styles.label}>{label}</Text>
@@ -397,7 +341,7 @@ const Field = ({
         multiline={multiline}
         keyboardType={keyboardType || "default"}
         autoCapitalize={autoCapitalize || "sentences"}
-        placeholder={`Enter ${label.toLowerCase()}`}
+        placeholder={placeholder || `Enter ${label.toLowerCase()}`}
         placeholderTextColor="#94a3b8"
         editable={true}
       />
@@ -432,70 +376,54 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: HEADER_HEIGHT,
-    backgroundColor: "#7C3AED",
-    paddingTop: Platform.OS === "ios" ? 60 : 40,
-    alignItems: "center",
+    paddingTop: Platform.OS === "ios" ? 50 : 30,
     zIndex: 10,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
-  photoContainer: {
-    position: "relative",
-    marginBottom: 10,
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
   },
-  profilePhoto: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    borderWidth: 4,
-    borderColor: "#fff",
+  backButton: {
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
-  placeholderPhoto: {
-    backgroundColor: "#9F7AEA",
-    justifyContent: "center",
+  headerTitleContainer: {
     alignItems: "center",
   },
-  placeholderText: {
-    color: "#fff",
-    fontSize: 40,
-    fontWeight: "bold",
-  },
-  cameraBtn: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-    backgroundColor: "#10B981",
-    padding: 8,
-    borderRadius: 20,
-    borderWidth: 3,
-    borderColor: "#fff",
-  },
-  name: {
+  headerTitle: {
     fontSize: 20,
     fontWeight: "bold",
     color: "#fff",
   },
-  role: {
-    fontSize: 13,
-    color: "rgba(255,255,255,0.85)",
-    marginTop: 4,
-    letterSpacing: 1,
+  headerSubtitle: {
+    fontSize: 12,
+    color: "#fff",
+    opacity: 0.8,
+    marginTop: 2,
   },
-  editBtn: {
+  editButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#EDE9FE",
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 20,
-    gap: 6,
-    marginTop: 10,
+    gap: 4,
   },
-  editText: {
-    color: "#7C3AED",
+  editButtonText: {
+    color: "#fff",
+    fontSize: 14,
     fontWeight: "600",
-    fontSize: 13,
   },
   scrollContent: {
     paddingHorizontal: 20,
@@ -551,6 +479,27 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
     fontSize: 16,
+  },
+  // Layout rows
+  row: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 4,
+  },
+  halfWidth: {
+    flex: 1,
+  },
+  emailFieldWidth: {
+    flex: 0.5,
+  },
+  phoneFieldWidth: {
+    flex: 0.5,
+  },
+  dateFieldWidth: {
+    flex: 0.4,
+  },
+  genderFieldWidth: {
+    flex: 0.6,
   },
 });
 

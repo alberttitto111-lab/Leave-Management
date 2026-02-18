@@ -13,6 +13,19 @@ import {
 } from "../utils/pdfGenerator.js";
 import mongoose from "mongoose";
 
+import {
+  getProfile,
+  updateProfile,
+  getDashboardStats,
+  getPendingLeaves,
+  getLeaveHistory,
+  getLeaveDetails,
+  approveLeave,
+  rejectLeave,
+  getStudents,
+  getStudentDetails,
+} from "../controllers/teacherController.js";
+
 const router = express.Router();
 
 /* =====================================================
@@ -20,6 +33,10 @@ const router = express.Router();
 ===================================================== */
 router.use(protect);
 router.use(authorize("teacher"));
+
+// Profile routes
+router.get("/profile", getProfile);
+router.patch("/profile", updateProfile);
 
 /* =====================================================
    HELPER — Get teacher class filter
