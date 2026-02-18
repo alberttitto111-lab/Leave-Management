@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
+import { useAuth } from "../../contexts/AuthContext";
 
 const StatCard = ({ icon, title, value, color, onPress }) => (
   <TouchableOpacity
@@ -87,13 +88,6 @@ const LeaveCard = ({ leave, onApprove, onReject }) => (
         <Ionicons name="close-circle" size={20} color="#fff" />
         <Text style={styles.actionBtnText}>Reject</Text>
       </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.actionCard}
-        onPress={() => navigation.navigate("TeacherLeaveRequests")}
-      >
-        <Ionicons name="time" size={28} color="#F59E0B" />
-        <Text style={styles.actionText}>Leave Requests</Text>
-      </TouchableOpacity>
     </View>
   </View>
 );
@@ -128,6 +122,7 @@ const formatDate = (date) => {
 };
 
 const TeacherDashboard = ({ navigation }) => {
+  const { logout } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -173,11 +168,10 @@ const TeacherDashboard = ({ navigation }) => {
 
   const handleApproveLeave = async (leaveId) => {
     try {
-      await api.patch(`/teacher/leaves/${leaveId}`, {
-        status: "approved",
+      await api.post(`/teacher/leaves/${leaveId}/approve`, {
         remarks: "Approved by teacher",
       });
-      Alert.alert("Success", "Leave approved");
+      Alert.alert("Success", "Leave approved and forwarded to HOD");
       loadDashboardData();
     } catch (error) {
       Alert.alert(
@@ -190,17 +184,16 @@ const TeacherDashboard = ({ navigation }) => {
   const handleRejectLeave = async (leaveId) => {
     Alert.prompt(
       "Reject Leave",
-      "Enter remarks (optional)",
+      "Enter reason for rejection:",
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Reject",
           style: "destructive",
-          onPress: async (remarks) => {
+          onPress: async (reason) => {
             try {
-              await api.patch(`/teacher/leaves/${leaveId}`, {
-                status: "rejected",
-                remarks: remarks || "Rejected by teacher",
+              await api.post(`/teacher/leaves/${leaveId}/reject`, {
+                reason: reason || "Rejected by class teacher",
               });
               Alert.alert("Success", "Leave rejected");
               loadDashboardData();
@@ -218,19 +211,34 @@ const TeacherDashboard = ({ navigation }) => {
   };
 
   const navigateToStudents = () => {
-    // Navigate to My Class tab (which uses StudentList)
     navigation.navigate("My Class");
   };
 
   const navigateToProfile = () => {
-    // Go up to App stack, then to TeacherProfile
     navigation.getParent()?.navigate("TeacherProfile");
+  };
+
+  const navigateToLeaveRequests = () => {
+    navigation.navigate("TeacherLeaveRequests");
+  };
+
+  const navigateToLeaveHistory = () => {
+    navigation.navigate("TeacherLeaveHistory");
+  };
+
+  // Immediate logout without confirmation
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#7C3AED" />
+        <ActivityIndicator size="large" color="#0D9488" />
       </View>
     );
   }
@@ -242,31 +250,34 @@ const TeacherDashboard = ({ navigation }) => {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      {/* Header with Profile */}
+      {/* Header with Teal Background */}
       <View style={styles.header}>
-        <View style={styles.welcomeSection}>
-          <Text style={styles.greeting}>Welcome back,</Text>
-          <Text style={styles.teacherName}>
-            {profile?.personalInfo?.firstName} {profile?.personalInfo?.lastName}
-          </Text>
-          <View style={styles.badges}>
-            {stats.isClassTeacher && (
-              <View style={styles.badge}>
-                <Ionicons name="star" size={12} color="#F59E0B" />
-                <Text style={styles.badgeText}>Class Teacher</Text>
+        <View style={styles.headerContent}>
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.greeting}>Welcome back,</Text>
+            <Text style={styles.teacherName}>
+              {profile?.personalInfo?.firstName} {profile?.personalInfo?.lastName}
+            </Text>
+            <View style={styles.badgeContainer}>
+              {stats.isClassTeacher && (
+                <View style={[styles.badge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                  <Ionicons name="star" size={12} color="#FFD700" />
+                  <Text style={styles.badgeText}>Class Teacher</Text>
+                </View>
+              )}
+              <View style={[styles.badge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                <Ionicons name="book" size={12} color="#fff" />
+                <Text style={styles.badgeText}>
+                  {stats.subjects?.length || 0} Subjects
+                </Text>
               </View>
-            )}
-            <View style={styles.badge}>
-              <Ionicons name="book" size={12} color="#3B82F6" />
-              <Text style={styles.badgeText}>
-                {stats.subjects?.length || 0} Subjects
-              </Text>
             </View>
           </View>
+
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+            <Ionicons name="log-out-outline" size={24} color="#fff" />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.profileBtn} onPress={navigateToProfile}>
-          <Ionicons name="person-circle" size={50} color="#7C3AED" />
-        </TouchableOpacity>
       </View>
 
       {/* Stats Grid */}
@@ -275,7 +286,7 @@ const TeacherDashboard = ({ navigation }) => {
           icon="people"
           title="My Students"
           value={stats.totalStudents}
-          color="#7C3AED"
+          color="#0D9488"
           onPress={navigateToStudents}
         />
         <StatCard
@@ -283,21 +294,20 @@ const TeacherDashboard = ({ navigation }) => {
           title="Pending Leaves"
           value={stats.pendingLeaves}
           color="#F59E0B"
-          onPress={() => navigation.navigate("TeacherLeaveHistory")}
+          onPress={navigateToLeaveRequests}
         />
-
         <StatCard
-          icon="close-circle"
-          title="Absent Today"
-          value={stats.todayAbsents}
-          color="#EF4444"
-          onPress={() => {}}
+          icon="checkmark-circle"
+          title="Approved"
+          value={stats.approvedLeaves || 0}
+          color="#10B981"
+          onPress={navigateToLeaveHistory}
         />
         <StatCard
           icon="calendar"
           title="My Classes"
           value={stats.assignedClasses?.length || 0}
-          color="#10B981"
+          color="#3B82F6"
           onPress={() => {}}
         />
       </View>
@@ -316,20 +326,47 @@ const TeacherDashboard = ({ navigation }) => {
         </View>
       )}
 
+      {/* Quick Actions */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <View style={styles.quickActions}>
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={navigateToStudents}
+          >
+            <View style={[styles.actionIcon, { backgroundColor: '#0D9488' }]}>
+              <Ionicons name="people" size={24} color="#fff" />
+            </View>
+            <Text style={styles.actionText}>My Students</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={navigateToLeaveRequests}
+          >
+            <View style={[styles.actionIcon, { backgroundColor: '#F59E0B' }]}>
+              <Ionicons name="time" size={24} color="#fff" />
+            </View>
+            <Text style={styles.actionText}>Leave Requests</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={navigateToProfile}
+          >
+            <View style={[styles.actionIcon, { backgroundColor: '#3B82F6' }]}>
+              <Ionicons name="person" size={24} color="#fff" />
+            </View>
+            <Text style={styles.actionText}>My Profile</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* Pending Leaves Section */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Pending Leave Approvals</Text>
-          <TouchableOpacity
-            onPress={() => navigation.navigate("TeacherLeaveRequests")}
-          >
+          <TouchableOpacity onPress={navigateToLeaveRequests}>
             <Text style={styles.seeAll}>See All</Text>
           </TouchableOpacity>
-          {/* <TouchableOpacity
-            onPress={() => navigation.navigate("TeacherLeaveHistory")}
-          >
-            <Text style={styles.seeAll}>See All History</Text>
-          </TouchableOpacity> */}
         </View>
 
         {pendingLeaves.length === 0 ? (
@@ -338,7 +375,7 @@ const TeacherDashboard = ({ navigation }) => {
             <Text style={styles.emptyText}>No pending leave requests</Text>
           </View>
         ) : (
-          pendingLeaves.map((leave) => (
+          pendingLeaves.slice(0, 3).map((leave) => (
             <LeaveCard
               key={leave._id}
               leave={leave}
@@ -349,33 +386,7 @@ const TeacherDashboard = ({ navigation }) => {
         )}
       </View>
 
-      {/* Quick Actions */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <View style={styles.quickActions}>
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={navigateToStudents}
-          >
-            <Ionicons name="people" size={28} color="#7C3AED" />
-            <Text style={styles.actionText}>View Students</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => navigation.navigate("MarkAttendance")}
-          >
-            <Ionicons name="checkbox" size={28} color="#10B981" />
-            <Text style={styles.actionText}>Mark Attendance</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => navigation.navigate("UploadMarks")}
-          >
-            <Ionicons name="document-text" size={28} color="#3B82F6" />
-            <Text style={styles.actionText}>Upload Marks</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      
     </ScrollView>
   );
 };
@@ -391,85 +402,95 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    paddingTop: 60,
-    backgroundColor: "#fff",
+    backgroundColor: "#0D9488", // Teal color for header
+    paddingTop: 40,
+    paddingBottom: 30,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
     elevation: 5,
   },
-  welcomeSection: {
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+  },
+  headerTextContainer: {
     flex: 1,
   },
   greeting: {
     fontSize: 14,
-    color: "#64748B",
+    color: "rgba(255,255,255,0.9)",
     marginBottom: 4,
+    fontWeight: "500",
   },
   teacherName: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#1E293B",
-    marginBottom: 8,
+    color: "#fff",
+    marginBottom: 10,
   },
-  badges: {
+  badgeContainer: {
     flexDirection: "row",
     gap: 8,
   },
   badge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F1F5F9",
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 20,
     gap: 4,
   },
   badgeText: {
-    fontSize: 12,
-    color: "#475569",
-    fontWeight: "500",
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#fff",
   },
-  profileBtn: {
-    padding: 4,
+  logoutButton: {
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    marginLeft: 12,
   },
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    padding: 15,
-    gap: 10,
+    padding: 16,
+    gap: 12,
+    marginTop: 10,
   },
   statCard: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#fff",
     borderRadius: 16,
-    padding: 15,
+    padding: 16,
     width: "47%",
     borderLeftWidth: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 5,
+    shadowRadius: 8,
     elevation: 2,
   },
   iconContainer: {
-    padding: 10,
+    width: 48,
+    height: 48,
     borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 12,
   },
   statContent: {
     flex: 1,
   },
   statValue: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "bold",
     color: "#1E293B",
   },
@@ -479,45 +500,49 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   section: {
-    padding: 20,
+    paddingHorizontal: 20,
+    marginTop: 20,
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 15,
+    marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: "bold",
+    fontWeight: "700",
     color: "#1E293B",
-    marginBottom: 15,
   },
   seeAll: {
-    color: "#7C3AED",
+    fontSize: 14,
+    color: "#0D9488",
     fontWeight: "600",
   },
   classChip: {
-    backgroundColor: "#EDE9FE",
+    backgroundColor: "#E6FFFA",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     marginRight: 10,
+    borderWidth: 1,
+    borderColor: "#0D9488",
   },
   classChipText: {
-    color: "#7C3AED",
+    color: "#0D9488",
     fontWeight: "600",
+    fontSize: 14,
   },
   emptyState: {
     alignItems: "center",
-    padding: 40,
+    padding: 32,
     backgroundColor: "#fff",
     borderRadius: 16,
   },
   emptyText: {
-    marginTop: 10,
-    color: "#64748B",
+    marginTop: 12,
     fontSize: 14,
+    color: "#64748B",
   },
   leaveCard: {
     backgroundColor: "#fff",
@@ -527,7 +552,7 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 5,
+    shadowRadius: 8,
     elevation: 2,
   },
   leaveHeader: {
@@ -543,11 +568,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#1E293B",
+    marginBottom: 2,
   },
   studentId: {
     fontSize: 12,
     color: "#64748B",
-    marginTop: 2,
   },
   statusBadge: {
     paddingHorizontal: 10,
@@ -606,7 +631,9 @@ const styles = StyleSheet.create({
   },
   quickActions: {
     flexDirection: "row",
-    gap: 10,
+    gap: 12,
+    marginTop: 8,
+    marginBottom: 20,
   },
   actionCard: {
     flex: 1,
@@ -617,14 +644,21 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 5,
+    shadowRadius: 8,
     elevation: 2,
   },
+  actionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
+  },
   actionText: {
-    marginTop: 8,
     fontSize: 12,
     color: "#475569",
-    fontWeight: "500",
+    fontWeight: "600",
     textAlign: "center",
   },
 });

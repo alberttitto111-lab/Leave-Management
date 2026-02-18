@@ -163,6 +163,7 @@ const AdminTabs = () => (
       name="Dashboard" 
       component={AdminDashboard} 
       options={{
+        headerShown: false,
         tabBarLabel: "Dashboard",
       }}
     />
@@ -292,8 +293,15 @@ const TeacherTabs = () => (
       tabBarInactiveTintColor: "gray",
     })}
   >
-    <Tab.Screen name="Dashboard" component={TeacherDashboard} />
-    <Tab.Screen name="My Class" component={StudentList} />
+    <Tab.Screen name="Dashboard"
+    options={{
+                  headerShown: false,
+                  title: "Dashboard",
+                  headerStyle: { backgroundColor: "#7C3AED" },
+                  headerTintColor: "#fff",
+                }}
+    component={TeacherDashboard} />
+    <Tab.Screen name="My Class" component={StudentList} />                                            
     <Tab.Screen name="Approvals" component={TeacherDashboard} />
   </Tab.Navigator>
 );
