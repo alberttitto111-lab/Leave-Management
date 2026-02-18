@@ -7,11 +7,13 @@ import {
   StyleSheet,
   RefreshControl,
   TextInput,
+  StatusBar,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 
-/* ---------------- CARD ---------------- */
+/* ----------------------------- CARD ----------------------------- */
 
 const StudentCard = ({ student, onPress }) => (
   <TouchableOpacity style={styles.card} onPress={() => onPress(student)}>
@@ -21,25 +23,21 @@ const StudentCard = ({ student, onPress }) => (
         {student?.personalInfo?.lastName?.[0] || ""}
       </Text>
     </View>
-
     <View style={styles.info}>
       <Text style={styles.name}>
         {student?.personalInfo?.firstName} {student?.personalInfo?.lastName}
       </Text>
-
       <Text style={styles.details}>
         {student?.academicInfo?.class}-{student?.academicInfo?.section} • Roll:{" "}
         {student?.academicInfo?.rollNumber}
       </Text>
-
       <Text style={styles.id}>{student?.userId}</Text>
     </View>
-
     <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
   </TouchableOpacity>
 );
 
-/* ---------------- MAIN ---------------- */
+/* ----------------------------- MAIN ----------------------------- */
 
 const StudentList = ({ navigation }) => {
   const [students, setStudents] = useState([]);
@@ -56,12 +54,11 @@ const StudentList = ({ navigation }) => {
     filterStudents();
   }, [searchQuery, students]);
 
-  /* ---------------- LOAD ---------------- */
+  /* ----------------------------- LOAD ----------------------------- */
 
   const loadStudents = async () => {
     try {
       const response = await api.get("/teacher/students");
-
       console.log("Students API response:", response.data);
 
       // Accept multiple backend shapes safely
@@ -81,7 +78,7 @@ const StudentList = ({ navigation }) => {
     }
   };
 
-  /* ---------------- FILTER ---------------- */
+  /* ----------------------------- FILTER ----------------------------- */
 
   const filterStudents = () => {
     if (!searchQuery) {
@@ -90,7 +87,6 @@ const StudentList = ({ navigation }) => {
     }
 
     const query = searchQuery.toLowerCase();
-
     const filtered = (students || []).filter((s) => {
       return (
         s?.userId?.toLowerCase?.().includes(query) ||
@@ -103,7 +99,7 @@ const StudentList = ({ navigation }) => {
     setFilteredStudents(filtered);
   };
 
-  /* ---------------- HANDLERS ---------------- */
+  /* ----------------------------- HANDLERS ----------------------------- */
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -114,17 +110,36 @@ const StudentList = ({ navigation }) => {
     navigation.navigate("StudentDetail", { studentId: student._id });
   };
 
-  /* ---------------- UI ---------------- */
+  const handleBackPress = () => {
+    navigation.goBack();
+  };
+
+  /* ----------------------------- UI ----------------------------- */
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>My Students</Text>
-        <Text style={styles.subtitle}>
-          {students?.length || 0} students assigned
-        </Text>
+      <StatusBar barStyle="light-content" backgroundColor="#0D9488" />
+      
+      {/* Header with Back Button */}
+      <View style={[styles.header, { backgroundColor: "#0D9488" }]}>
+        <View style={styles.headerTop}>
+          <TouchableOpacity
+            onPress={handleBackPress}
+            style={styles.backButton}
+          >
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.title}>My Students</Text>
+            <Text style={styles.subtitle}>
+              {students?.length || 0} students assigned
+            </Text>
+          </View>
+          <View style={{ width: 40 }} />
+        </View>
       </View>
 
+      {/* Search Bar */}
       <View style={styles.searchContainer}>
         <Ionicons name="search" size={20} color="#64748B" />
         <TextInput
@@ -133,6 +148,11 @@ const StudentList = ({ navigation }) => {
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery("")}>
+            <Ionicons name="close-circle" size={20} color="#94A3B8" />
+          </TouchableOpacity>
+        )}
       </View>
 
       <FlatList
@@ -146,42 +166,64 @@ const StudentList = ({ navigation }) => {
         }
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="people" size={48} color="#CBD5E1" />
-            <Text style={styles.emptyText}>No students found</Text>
-          </View>
+          !loading && (
+            <View style={styles.emptyState}>
+              <Ionicons name="people" size={48} color="#CBD5E1" />
+              <Text style={styles.emptyText}>No students found</Text>
+            </View>
+          )
         }
       />
     </View>
   );
 };
 
-/* ---------------- STYLES ---------------- */
+/* ----------------------------- STYLES ----------------------------- */
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#e4e4e4",
   },
   header: {
-    padding: 20,
-    paddingTop: 60,
-    backgroundColor: "#7C3AED",
+    paddingTop: Platform.OS === "ios" ? 50 : 30,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  headerTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  headerTitleContainer: {
+    alignItems: "center",
   },
   title: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: "bold",
     color: "#fff",
   },
   subtitle: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.8)",
+    fontSize: 12,
+    color: "rgba(255, 255, 255, 0.8)",
     marginTop: 4,
   },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: "#fcfcfc",
     margin: 15,
     paddingHorizontal: 15,
     borderRadius: 12,
@@ -198,11 +240,12 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 15,
+    paddingTop: 5,
   },
   card: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: "#f7f7f7",
     padding: 15,
     borderRadius: 16,
     marginBottom: 10,
@@ -223,7 +266,7 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#7C3AED",
+    color: "#1a5ac7",
   },
   info: {
     flex: 1,
@@ -231,16 +274,21 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#1E293B",
+    color: "#000000",
   },
   details: {
     fontSize: 13,
-    color: "#64748B",
+    color: "#112746",
     marginTop: 2,
   },
   id: {
     fontSize: 12,
-    color: "#94A3B8",
+    color: "#444546",
+    backgroundColor: "#6dff9b3d",
+    alignSelf: "flex-start",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
     marginTop: 2,
   },
   emptyState: {

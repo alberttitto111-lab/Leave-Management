@@ -301,7 +301,14 @@ const TeacherTabs = () => (
                   headerTintColor: "#fff",
                 }}
     component={TeacherDashboard} />
-    <Tab.Screen name="My Class" component={StudentList} />                                            
+    <Tab.Screen name="My Class"
+    options={{
+                  headerShown: false,
+                  title: "My Class",
+                  headerStyle: { backgroundColor: "#7C3AED" },
+                  headerTintColor: "#fff",
+                }}
+    component={StudentList} />                                            
     <Tab.Screen name="Approvals" component={TeacherDashboard} />
   </Tab.Navigator>
 );
@@ -436,7 +443,7 @@ const AppNavigator = () => {
                 name="StudentDetail"
                 component={StudentDetail}
                 options={{
-                  headerShown: true,
+                  headerShown: false,
                   title: "Student Details",
                   headerStyle: { backgroundColor: "#0D9488" },
                   headerTintColor: "#fff",
@@ -446,7 +453,7 @@ const AppNavigator = () => {
                 name="TeacherLeaveRequests"
                 component={TeacherLeaveRequestsScreen}
                 options={{
-                  headerShown: true,
+                  headerShown: false,
                   title: "Leave Requests",
                   headerStyle: { backgroundColor: "#0D9488" },
                   headerTintColor: "#fff",

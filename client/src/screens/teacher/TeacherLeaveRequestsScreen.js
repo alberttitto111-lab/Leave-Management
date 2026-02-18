@@ -4,16 +4,23 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
+  ScrollView,
   TouchableOpacity,
   ActivityIndicator,
   Alert,
   RefreshControl,
+  StatusBar,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
+import { useAuth } from "../../contexts/AuthContext";
+
+const HEADER_HEIGHT = 120;
 
 const TeacherLeaveRequestsScreen = ({ navigation }) => {
+  const { user } = useAuth();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -45,7 +52,7 @@ const TeacherLeaveRequestsScreen = ({ navigation }) => {
   const handleDecision = async (leaveId, action) => {
     try {
       setProcessingId(leaveId);
-
+      
       // Use the correct endpoint based on action
       const endpoint =
         action === "approve"
@@ -65,7 +72,6 @@ const TeacherLeaveRequestsScreen = ({ navigation }) => {
           ? "Leave approved and forwarded to HOD"
           : "Leave rejected",
       );
-
       loadRequests();
     } catch (err) {
       console.error("Decision error:", err);
@@ -78,7 +84,7 @@ const TeacherLeaveRequestsScreen = ({ navigation }) => {
     }
   };
 
-  const renderItem = ({ item }) => {
+  const renderItem = (item) => {
     // Fix: Use applicantId instead of student, and dateRange instead of fromDate/toDate
     const student = item.applicantId;
     const leaveType = item.leaveType;
@@ -125,7 +131,6 @@ const TeacherLeaveRequestsScreen = ({ navigation }) => {
               <Ionicons name="checkmark" size={18} color="#fff" />
               <Text style={styles.btnText}>Approve</Text>
             </TouchableOpacity>
-
             <TouchableOpacity
               style={[styles.btn, styles.reject]}
               onPress={() => handleDecision(item._id, "reject")}
@@ -169,37 +174,134 @@ const TeacherLeaveRequestsScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={requests}
-        keyExtractor={(item) => item._id}
-        renderItem={renderItem}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons
-              name="checkmark-circle-outline"
-              size={64}
-              color="#CBD5E1"
-            />
-            <Text style={styles.empty}>No pending leave requests</Text>
+      <StatusBar barStyle="light-content" backgroundColor="#0D9488" />
+
+      {/* Fixed Header - Similar to TeacherProfile */}
+      <View style={[styles.header, { backgroundColor: "#0D9488" }]}>
+        <View style={styles.headerTop}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>Leave Requests</Text>
+            <Text style={styles.headerSubtitle}>
+              {requests.length} pending request{requests.length !== 1 ? 's' : ''}
+            </Text>
           </View>
-        }
-      />
+          <View style={{ width: 40 }} />
+        </View>
+      </View>
+
+      {/* Scroll Area - Same pattern as TeacherProfile */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? HEADER_HEIGHT : 0}
+      >
+        <ScrollView
+          style={StyleSheet.absoluteFill}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={true}
+          persistentScrollbar={true}
+          indicatorStyle="black"
+          keyboardDismissMode="on-drag"
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          {/* Spacer for fixed header */}
+          <View style={{ height: HEADER_HEIGHT + 20 }} />
+
+          {requests.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons
+                name="checkmark-circle-outline"
+                size={64}
+                color="#CBD5E1"
+              />
+              <Text style={styles.empty}>No pending leave requests</Text>
+            </View>
+          ) : (
+            requests.map((item) => (
+              <React.Fragment key={item._id}>
+                {renderItem(item)}
+              </React.Fragment>
+            ))
+          )}
+
+          {/* Bottom padding for comfortable scrolling */}
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 };
 
-export default TeacherLeaveRequestsScreen;
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f5f6fa" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-
+  container: {
+    flex: 1,
+    backgroundColor: "#ebebeb",
+  },
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  // Header styles - matching TeacherProfile pattern
+  header: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: HEADER_HEIGHT,
+    paddingTop: Platform.OS === "ios" ? 50 : 30,
+    zIndex: 10,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  headerTitleContainer: {
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#fff",
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: "#fff",
+    opacity: 0.8,
+    marginTop: 2,
+  },
+  // Scroll content - matching TeacherProfile pattern
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+    flexGrow: 1,
+  },
   card: {
     backgroundColor: "#fff",
-    margin: 12,
+    marginBottom: 12,
     padding: 16,
     borderRadius: 12,
     elevation: 2,
@@ -208,44 +310,44 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-
   rowBetween: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 8,
   },
-
-  name: { fontSize: 16, fontWeight: "700", color: "#1E293B" },
-
+  name: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1E293B",
+  },
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
   },
-
   statusText: {
     fontSize: 12,
     fontWeight: "600",
     textTransform: "uppercase",
     color: "#fff",
   },
-
-  meta: { fontSize: 13, color: "#64748B", marginTop: 4 },
-
+  meta: {
+    fontSize: 13,
+    color: "#64748B",
+    marginTop: 4,
+  },
   reason: {
     fontSize: 14,
     marginTop: 8,
     color: "#374151",
     fontStyle: "italic",
   },
-
   actions: {
     flexDirection: "row",
     gap: 10,
     marginTop: 16,
   },
-
   btn: {
     flexDirection: "row",
     alignItems: "center",
@@ -256,17 +358,22 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
   },
-
-  approve: { backgroundColor: "#10B981" },
-  reject: { backgroundColor: "#EF4444" },
-
-  btnText: { color: "#fff", fontWeight: "600", fontSize: 14 },
-
+  approve: {
+    backgroundColor: "#10B981",
+  },
+  reject: {
+    backgroundColor: "#EF4444",
+  },
+  btnText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 14,
+  },
   emptyContainer: {
     alignItems: "center",
-    marginTop: 60,
+    justifyContent: "center",
+    paddingVertical: 60,
   },
-
   empty: {
     textAlign: "center",
     marginTop: 16,
@@ -274,3 +381,5 @@ const styles = StyleSheet.create({
     color: "#94A3B8",
   },
 });
+
+export default TeacherLeaveRequestsScreen;

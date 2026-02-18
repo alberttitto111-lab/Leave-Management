@@ -30,66 +30,46 @@ const StatCard = ({ icon, title, value, color, onPress }) => (
   </TouchableOpacity>
 );
 
-const LeaveCard = ({ leave, onApprove, onReject }) => (
-  <View style={styles.leaveCard}>
-    <View style={styles.leaveHeader}>
-      <View style={styles.studentInfo}>
-        <Text style={styles.studentName}>
-          {leave.studentId?.personalInfo?.firstName}{" "}
-          {leave.studentId?.personalInfo?.lastName}
+// Modified LeaveCard for horizontal design - removed buttons
+const LeaveCard = ({ leave, onPress }) => (
+  <TouchableOpacity style={styles.horizontalLeaveCard} onPress={() => onPress(leave)}>
+    <View style={styles.horizontalCardContent}>
+      <View style={styles.horizontalAvatarContainer}>
+        <View style={styles.horizontalAvatar}>
+          <Text style={styles.horizontalAvatarText}>
+            {leave.applicantId?.personalInfo?.firstName?.charAt(0) || ""}
+            {leave.applicantId?.personalInfo?.lastName?.charAt(0) || ""}
+          </Text>
+        </View>
+      </View>
+      
+      <View style={styles.horizontalCardDetails}>
+        <View style={styles.horizontalRow}>
+          <Text style={styles.horizontalStudentName} numberOfLines={1}>
+            {leave.applicantId?.personalInfo?.firstName || ""} {leave.applicantId?.personalInfo?.lastName || ""}
+          </Text>
+          <View
+            style={[
+              styles.horizontalStatusBadge,
+              { backgroundColor: getStatusColor(leave.status) },
+            ]}
+          >
+            <Text style={styles.horizontalStatusText}>
+              {leave.status?.replace(/_/g, " ")}
+            </Text>
+          </View>
+        </View>
+        
+        <Text style={styles.horizontalLeaveType} numberOfLines={1}>
+          {leave.leaveType?.name || "Leave"} • {leave.dateRange?.days || 0} day(s)
         </Text>
-        <Text style={styles.studentId}>{leave.studentId?.userId}</Text>
-      </View>
-      <View
-        style={[
-          styles.statusBadge,
-          { backgroundColor: getStatusColor(leave.status) },
-        ]}
-      >
-        <Text style={styles.statusText}>{leave.status.replace(/_/g, " ")}</Text>
+        
+        <Text style={styles.horizontalLeaveDates} numberOfLines={1}>
+          {formatDate(leave.dateRange?.from)} - {formatDate(leave.dateRange?.to)}
+        </Text>
       </View>
     </View>
-
-    <View style={styles.leaveDetails}>
-      <DetailRow
-        icon="calendar-outline"
-        label="From"
-        value={formatDate(leave.fromDate)}
-      />
-      <DetailRow
-        icon="calendar-outline"
-        label="To"
-        value={formatDate(leave.toDate)}
-      />
-      <DetailRow
-        icon="document-text-outline"
-        label="Type"
-        value={leave.leaveType}
-      />
-      <DetailRow
-        icon="chatbubble-outline"
-        label="Reason"
-        value={leave.reason}
-      />
-    </View>
-
-    <View style={styles.leaveActions}>
-      <TouchableOpacity
-        style={[styles.actionBtn, styles.approveBtn]}
-        onPress={() => onApprove(leave._id)}
-      >
-        <Ionicons name="checkmark-circle" size={20} color="#fff" />
-        <Text style={styles.actionBtnText}>Approve</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.actionBtn, styles.rejectBtn]}
-        onPress={() => onReject(leave._id)}
-      >
-        <Ionicons name="close-circle" size={20} color="#fff" />
-        <Text style={styles.actionBtnText}>Reject</Text>
-      </TouchableOpacity>
-    </View>
-  </View>
+  </TouchableOpacity>
 );
 
 const DetailRow = ({ icon, label, value }) => (
@@ -97,28 +77,33 @@ const DetailRow = ({ icon, label, value }) => (
     <Ionicons name={icon} size={16} color="#64748B" />
     <Text style={styles.detailLabel}>{label}:</Text>
     <Text style={styles.detailValue} numberOfLines={1}>
-      {value}
+      {value || "N/A"}
     </Text>
   </View>
 );
 
 const getStatusColor = (status) => {
   const colors = {
-    pending_teacher: "#F59E0B",
-    pending_hod: "#3B82F6",
-    approved_by_teacher: "#10B981",
-    approved_by_hod: "#059669",
-    rejected: "#EF4444",
+    "pending": "#F59E0B",
+    "approved_by_teacher": "#3B82F6",
+    "approved_by_hod": "#10B981",
+    "approved": "#10B981",
+    "rejected": "#EF4444",
   };
   return colors[status] || "#6B7280";
 };
 
 const formatDate = (date) => {
-  return new Date(date).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  if (!date) return "N/A";
+  try {
+    return new Date(date).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  } catch (e) {
+    return "Invalid date";
+  }
 };
 
 const TeacherDashboard = ({ navigation }) => {
@@ -140,26 +125,26 @@ const TeacherDashboard = ({ navigation }) => {
     loadDashboardData();
   }, []);
 
-  const loadDashboardData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [statsRes, leavesRes, profileRes] = await Promise.all([
-        api.get("/teacher/dashboard-stats"),
-        api.get("/teacher/leaves/pending"),
-        api.get("/teacher/profile"),
-      ]);
-
-      setStats(statsRes.data.data);
-      setPendingLeaves(leavesRes.data.data);
-      setProfile(profileRes.data.data);
-    } catch (error) {
-      console.error("Dashboard load error:", error);
-      Alert.alert("Error", "Failed to load dashboard data");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+const loadDashboardData = useCallback(async () => {
+  try {
+    setLoading(true);
+    const [statsRes, leavesRes, profileRes] = await Promise.all([
+      api.get("/teacher/dashboard-stats"),
+      api.get("/teacher/leave-requests"),
+      api.get("/teacher/profile"),
+    ]);
+    
+    setStats(statsRes.data.data);
+    setPendingLeaves(leavesRes.data.data);
+    setProfile(profileRes.data.data);
+  } catch (error) {
+    console.error("Dashboard load error:", error);
+    Alert.alert("Error", "Failed to load dashboard data");
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+}, []);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -224,6 +209,27 @@ const TeacherDashboard = ({ navigation }) => {
 
   const navigateToLeaveHistory = () => {
     navigation.navigate("TeacherLeaveHistory");
+  };
+
+  // Handle leave card press - navigate to leave details with action sheet
+  const handleLeavePress = (leave) => {
+    Alert.alert(
+      "Leave Request",
+      `What would you like to do with ${leave.applicantId?.personalInfo?.firstName}'s leave request?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Approve", 
+          onPress: () => handleApproveLeave(leave._id),
+          style: "default"
+        },
+        { 
+          text: "Reject", 
+          onPress: () => handleRejectLeave(leave._id),
+          style: "destructive"
+        },
+      ]
+    );
   };
 
   // Immediate logout without confirmation
@@ -360,7 +366,7 @@ const TeacherDashboard = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Pending Leaves Section */}
+      {/* Pending Leaves Section - HORIZONTAL SCROLL */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Pending Leave Approvals</Text>
@@ -375,18 +381,21 @@ const TeacherDashboard = ({ navigation }) => {
             <Text style={styles.emptyText}>No pending leave requests</Text>
           </View>
         ) : (
-          pendingLeaves.slice(0, 3).map((leave) => (
-            <LeaveCard
-              key={leave._id}
-              leave={leave}
-              onApprove={handleApproveLeave}
-              onReject={handleRejectLeave}
-            />
-          ))
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.horizontalScrollView}
+          >
+            {pendingLeaves.map((leave) => (
+              <LeaveCard
+                key={leave._id}
+                leave={leave}
+                onPress={handleLeavePress}
+              />
+            ))}
+          </ScrollView>
         )}
       </View>
-
-      
     </ScrollView>
   );
 };
@@ -542,6 +551,81 @@ const styles = StyleSheet.create({
   emptyText: {
     marginTop: 12,
     fontSize: 14,
+    color: "#64748B",
+  },
+  // Horizontal scroll view styles
+  horizontalScrollView: {
+    marginBottom: 8,
+  },
+  horizontalLeaveCard: {
+    width: 260,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 16,
+    marginRight: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  horizontalCardContent: {
+    flexDirection: "row",
+  },
+  horizontalAvatarContainer: {
+    marginRight: 12,
+  },
+  horizontalAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#E6FFFA",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#0D9488",
+  },
+  horizontalAvatarText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#0D9488",
+  },
+  horizontalCardDetails: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  horizontalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  horizontalStudentName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1E293B",
+    flex: 1,
+    marginRight: 8,
+  },
+  horizontalStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  horizontalStatusText: {
+    color: "#fff",
+    fontSize: 8,
+    fontWeight: "600",
+    textTransform: "capitalize",
+  },
+  horizontalLeaveType: {
+    fontSize: 12,
+    color: "#0D9488",
+    fontWeight: "500",
+    marginBottom: 2,
+  },
+  horizontalLeaveDates: {
+    fontSize: 10,
     color: "#64748B",
   },
   leaveCard: {
