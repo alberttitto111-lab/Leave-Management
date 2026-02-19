@@ -210,12 +210,12 @@ const EditUserScreen = ({ navigation, route }) => {
                 setNewUserId(val);
                 setIsUpdated(false);
               }}
-              icon="finger-print-outline"
+              // icon="finger-print-outline"
             />
 
             <Text style={styles.label}>System Role</Text>
             <View style={styles.roleGrid}>
-              {["student", "teacher", "hod", "staff", "admin"].map((r) => (
+              {["student", "teacher", "hod"].map((r) => (
                 <TouchableOpacity
                   key={r}
                   style={[styles.roleBtn, role === r && styles.roleBtnActive]}
@@ -277,7 +277,7 @@ const EditUserScreen = ({ navigation, route }) => {
                 setFirstName(val);
                 setIsUpdated(false);
               }}
-              icon="person-outline"
+              // icon="person-outline"
             />
             <Input
               label="Last Name"
@@ -286,7 +286,7 @@ const EditUserScreen = ({ navigation, route }) => {
                 setLastName(val);
                 setIsUpdated(false);
               }}
-              icon="person-outline"
+              // icon="person-outline"
             />
             <Input
               label="Email Address"
@@ -295,7 +295,7 @@ const EditUserScreen = ({ navigation, route }) => {
                 setEmail(val);
                 setIsUpdated(false);
               }}
-              icon="mail-outline"
+              // icon="mail-outline"
               keyboardType="email-address"
             />
             <Input
@@ -305,7 +305,7 @@ const EditUserScreen = ({ navigation, route }) => {
                 setPhone(val);
                 setIsUpdated(false);
               }}
-              icon="call-outline"
+              // icon="call-outline"
               keyboardType="phone-pad"
             />
             <Input
@@ -315,7 +315,7 @@ const EditUserScreen = ({ navigation, route }) => {
                 setAddress(val);
                 setIsUpdated(false);
               }}
-              icon="location-outline"
+              // icon="location-outline"
               multiline
             />
 
@@ -330,7 +330,7 @@ const EditUserScreen = ({ navigation, route }) => {
                     setRollNumber(val);
                     setIsUpdated(false);
                   }}
-                  icon="id-card-outline"
+                  // icon="id-card-outline"
                 />
                 <View style={styles.row}>
                   <View style={{ flex: 1, marginRight: 10 }}>
@@ -341,7 +341,7 @@ const EditUserScreen = ({ navigation, route }) => {
                         setClassName(val);
                         setIsUpdated(false);
                       }}
-                      icon="school-outline"
+                      // icon="school-outline"
                     />
                   </View>
                   <View style={{ flex: 1 }}>
@@ -352,7 +352,7 @@ const EditUserScreen = ({ navigation, route }) => {
                         setSection(val);
                         setIsUpdated(false);
                       }}
-                      icon="git-branch-outline"
+                      // icon="git-branch-outline"
                     />
                   </View>
                 </View>
@@ -363,7 +363,7 @@ const EditUserScreen = ({ navigation, route }) => {
                     setBatchYear(val);
                     setIsUpdated(false);
                   }}
-                  icon="calendar-outline"
+                  // icon="calendar-outline"
                   keyboardType="number-pad"
                 />
 
@@ -446,7 +446,11 @@ const EditUserScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+  container: 
+  { flex: 1, 
+    backgroundColor: "#f1efff",
+  },
+
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   fixedHeader: {
     position: "absolute",
@@ -474,7 +478,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.2)",
   },
   scrollContent: { flexGrow: 1, paddingHorizontal: 20 },
-  ghostSpacer: { height: 150 },
+  ghostSpacer: { height: 140 },
   formCard: {
     backgroundColor: COLORS.white,
     borderRadius: 24,
@@ -503,7 +507,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#e5e8ed",
+    backgroundColor: "#e5e9ed",
   },
   roleBtnActive: { backgroundColor: COLORS.admin, borderColor: COLORS.admin },
   roleBtnText: { fontSize: 12, color: COLORS.slate },
@@ -513,7 +518,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 6,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "#e7ebef",
   },
   deptBtnActive: {
     backgroundColor: "#EDE9FE",

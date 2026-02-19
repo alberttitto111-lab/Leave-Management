@@ -64,18 +64,12 @@ const AdminDashboard = ({ navigation }) => {
       title: "Manage Users",
       icon: "account-cog",
       screen: "Users",
-      color: COLORS.admin,
+      color: COLORS.danger,
     },
     {
       title: "Add User",
       icon: "account-plus",
       screen: "AddUser",
-      color: COLORS.admin,
-    },
-    {
-      title: "Bulk Upload",
-      icon: "cloud-upload",
-      screen: "BulkUpload",
       color: COLORS.success,
     },
     {
@@ -91,6 +85,14 @@ const AdminDashboard = ({ navigation }) => {
       color: COLORS.warning,
     },
     // Disabled Buttons
+    {
+      title: "Bulk Upload",
+      icon: "cloud-upload",
+      color: COLORS.gray,
+      disabled: true,
+      disabledIcon: "lock-outline",
+      disabledMessage: "Coming Soon",
+    },
     {
       title: "Reports",
       icon: "chart-bar",
@@ -152,16 +154,16 @@ const AdminDashboard = ({ navigation }) => {
         {/* Stats Grid */}
         <View style={styles.statsContainer}>
           <TouchableOpacity
-            style={[styles.statCard, { borderLeftColor: COLORS.admin }]}
+            style={[styles.statCard, { borderLeftColor: COLORS.danger }]}
             activeOpacity={0.8}
           >
             <View
               style={[
                 styles.iconContainer,
-                { backgroundColor: COLORS.admin + "20" },
+                { backgroundColor: COLORS.danger + "20" },
               ]}
             >
-              <Icon name="account-group" size={24} color={COLORS.admin} />
+              <Icon name="account-group" size={24} color={COLORS.danger} />
             </View>
             <Text style={styles.statValue}>{stats.totalUsers}</Text>
             <Text style={styles.statTitle}>Total Users</Text>
@@ -200,16 +202,16 @@ const AdminDashboard = ({ navigation }) => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.statCard, { borderLeftColor: COLORS.info }]}
+            style={[styles.statCard, { borderLeftColor: COLORS.warning }]}
             activeOpacity={0.8}
           >
             <View
               style={[
                 styles.iconContainer,
-                { backgroundColor: COLORS.info + "20" },
+                { backgroundColor: COLORS.warning + "20" },
               ]}
             >
-              <Icon name="shield-account" size={24} color={COLORS.info} />
+              <Icon name="shield-account" size={24} color={COLORS.warning} />
             </View>
             <Text style={styles.statValue}>{stats.totalHODs}</Text>
             <Text style={styles.statTitle}>HODs</Text>
@@ -273,7 +275,7 @@ const AdminDashboard = ({ navigation }) => {
         <View style={styles.comingSoonNote}>
           <Icon name="information-outline" size={16} color={COLORS.info} />
           <Text style={styles.comingSoonNoteText}>
-            Reports and Settings features are under development and will be available soon.
+            Bulk Upload, Reports, and Settings features are under development and will be available soon.
           </Text>
         </View>
 
@@ -292,10 +294,10 @@ const AdminDashboard = ({ navigation }) => {
                   <View
                     style={[
                       styles.activityIndicator,
-                      { backgroundColor: COLORS.primary + "20" },
+                      { backgroundColor: COLORS.success + "20" },
                     ]}
                   >
-                    <Icon name="account" size={16} color={COLORS.primary} />
+                    <Icon name="account" size={16} color={COLORS.success} />
                   </View>
                   <View style={styles.activityContent}>
                     <Text style={styles.activityUser}>{activity.user}</Text>
@@ -313,8 +315,23 @@ const AdminDashboard = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  header: { paddingTop: 30, paddingHorizontal: 20, paddingBottom: 70 },
+  container: 
+  { flex: 1, 
+    backgroundColor: "#f1efff",
+  },
+  header: { 
+  // backgroundColor: "#0D9488",
+  paddingTop: 60,  
+  paddingBottom: 40,  
+  paddingHorizontal: 30,
+  borderBottomLeftRadius: 30,
+  borderBottomRightRadius: 30,
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.2,
+  shadowRadius: 8,
+  elevation: 5,
+},
   headerTop: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -331,8 +348,9 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 12,
     backgroundColor: "rgba(255, 255, 255, 0.35)",
+    marginTop: 10,
   },
-  content: { flex: 1, marginTop: 2 },  ///change to create a small gap between header and content
+  content: { flex: 1, marginTop: 6 },  ///change to create a small gap between header and content
   statsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -350,7 +368,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
-    marginBottom: 12,
+    marginBottom: 2,
   },
   iconContainer: {
     width: 40,
@@ -386,7 +404,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
-    marginBottom: 12,
+    marginBottom: 2,
     position: "relative",
   },
   disabledCard: {

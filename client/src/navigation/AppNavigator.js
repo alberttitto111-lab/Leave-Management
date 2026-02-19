@@ -181,6 +181,40 @@ const AdminTabs = () => (
       component={UserManagementScreen}
     />
     
+    {/* Disabled Bulk upload Tab */}
+    <Tab.Screen
+      name="Bulk Upload"
+      component={View} // Empty component
+      options={{
+        tabBarLabel: ({ color }) => (
+          <View style={styles.disabledLabelContainer}>
+            <Text style={[styles.disabledLabel, { color: "#9CA3AF" }]}>Bulk Upload</Text>
+          </View>
+        ),
+        tabBarButton: (props) => (
+          <View style={styles.disabledTabButton}>
+            <View style={styles.disabledContent}>
+              {props.children}
+            </View>
+          </View>
+        ),
+        tabBarIcon: ({ size }) => (
+          <View style={styles.disabledIconContainer}>
+            <Ionicons name="cloud-upload" size={size} color="#9CA3AF" />
+            <View style={styles.lockBadgeSmall}>
+              <Ionicons name="lock-closed" size={8} color="#fff" />
+            </View>
+          </View>
+        ),
+      }}
+      listeners={{
+        tabPress: (e) => {
+          // Prevent navigation
+          e.preventDefault();
+        },
+      }}
+    />
+
     {/* Disabled Reports Tab */}
     <Tab.Screen
       name="Reports"

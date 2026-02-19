@@ -50,10 +50,10 @@ const UserItem = ({ user, onPress, onDelete }) => (
         <View
           style={[
             styles.statusDot,
-            { backgroundColor: user.isActive ? "#10B981" : "#EF4444" },
+            { backgroundColor: user.isActive ? "#10b948" : "#f41b1b" },
           ]}
         />
-        <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
+        <Ionicons name="chevron-forward" size={20} color="#989da4" />
       </View>
     </TouchableOpacity>
     {/* Delete Button */}
@@ -68,11 +68,11 @@ const UserItem = ({ user, onPress, onDelete }) => (
 
 const getRoleColor = (role) => {
   const colors = {
-    admin: "#7C3AED",
-    hod: "#4338CA",
-    teacher: "#0D9488",
-    student: "#2563EB",
-    staff: "#F59E0B",
+    admin: "#ec2b2b",
+    hod: "#eb862d",
+    teacher: "#0d944a",
+    student: "#2461e5",
+    staff: "#c847c8",
   };
   return colors[role] || "#64748B";
 };
@@ -402,7 +402,7 @@ const UserManagementScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#f1efff",
   },
   header: {
     paddingTop: 30,
