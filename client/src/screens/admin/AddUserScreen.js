@@ -544,7 +544,7 @@ const AddUserScreen = ({ navigation }) => {
             keyboardType="number-pad"
           />
 
-          <Text style={styles.sectionHeader}>Parent Details</Text>
+          {/* <Text style={styles.sectionHeader}>Parent Details</Text>
 
           <InputField
             label="Father's Name"
@@ -569,7 +569,7 @@ const AddUserScreen = ({ navigation }) => {
             placeholder="Parent's contact number"
             icon="call-outline"
             keyboardType="phone-pad"
-          />
+          /> */}
         </View>
       </ScrollView>
     );

@@ -367,7 +367,7 @@ const EditUserScreen = ({ navigation, route }) => {
                   keyboardType="number-pad"
                 />
 
-                <Text style={styles.sectionHeader}>Parent Details</Text>
+                {/* <Text style={styles.sectionHeader}>Parent Details</Text>
                 <Input
                   label="Father's Name"
                   value={fatherName}
@@ -402,9 +402,9 @@ const EditUserScreen = ({ navigation, route }) => {
                   onChangeText={(val) => {
                     setParentEmail(val);
                     setIsUpdated(false);
-                  }}
-                  icon="mail-outline"
-                />
+                  }} */}
+                  {/* icon="mail-outline"
+                /> */}
               </>
             )}
           </View>

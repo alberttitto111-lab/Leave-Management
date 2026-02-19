@@ -34,6 +34,10 @@ import StudentDetail from "../screens/teacher/StudentDetail";
 import TeacherLeaveRequestsScreen from "../screens/teacher/TeacherLeaveRequestsScreen";
 import TeacherLeaveHistoryScreen from "../screens/teacher/TeacherLeaveHistoryScreen";
 
+// Import the new screens
+import TeacherApprovalsScreen from "../screens/teacher/TeacherApprovalsScreen";
+import TeacherRejectedScreen from "../screens/teacher/TeacherRejectedScreen";
+
 // Student Screens
 import StudentDashboard from "../screens/student/StudentDashboard";
 import LeaveHistoryScreen from "../screens/student/LeaveHistoryScreen";
@@ -285,8 +289,12 @@ const TeacherTabs = () => (
           iconName = focused ? "home" : "home-outline";
         else if (route.name === "My Class")
           iconName = focused ? "people" : "people-outline";
+        else if (route.name === "Leave Requests")
+          iconName = focused ? "document-text" : "document-text-outline";
         else if (route.name === "Approvals")
           iconName = focused ? "checkmark-circle" : "checkmark-circle-outline";
+        else if (route.name === "Rejected") 
+          iconName = focused ? "close-circle" : "close-circle-outline";
         return <Ionicons name={iconName} size={size} color={color} />;
       },
       tabBarActiveTintColor: "#0D9488",
@@ -308,8 +316,31 @@ const TeacherTabs = () => (
                   headerStyle: { backgroundColor: "#7C3AED" },
                   headerTintColor: "#fff",
                 }}
-    component={StudentList} />                                            
-    <Tab.Screen name="Approvals" component={TeacherDashboard} />
+    component={StudentList} />    
+    <Tab.Screen name="Leave Requests"
+    options={{
+                  headerShown: false,
+                  title: "Leave Requests",
+                  headerStyle: { backgroundColor: "#7C3AED" },
+                  headerTintColor: "#fff",
+                }}
+    component={TeacherLeaveRequestsScreen} />                                        
+    <Tab.Screen name="Approvals"
+    options={{
+                  headerShown: false,
+                  title: "Approvals",
+                  headerStyle: { backgroundColor: "#7C3AED" },
+                  headerTintColor: "#fff",
+                }}
+    component={TeacherApprovalsScreen} />
+    <Tab.Screen name="Rejected"
+    options={{
+                  headerShown: false,
+                  title: "Rejected Leaves",
+                  headerStyle: { backgroundColor: "#7C3AED" },
+                  headerTintColor: "#fff",
+                }}
+    component={TeacherRejectedScreen} />
   </Tab.Navigator>
 );
 
