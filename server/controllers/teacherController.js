@@ -24,50 +24,60 @@ const buildClassSectionFilter = (classSections = []) => {
     });
 };
 
-// @desc    Get dashboard stats
-// @route   GET /api/teacher/dashboard-stats
-// @access  Private/Teacher
+// @desc Get dashboard stats
+// @route GET /api/teacher/dashboard-stats
+// @access Private/Teacher
 export const getDashboardStats = asyncHandler(async (req, res) => {
-    const teacher = await User.findById(req.user.id);
-    if (!teacher) {
-        res.status(404);
-        throw new Error("Teacher not found");
-    }
-
-    const isClassTeacher = teacher.teachingInfo?.isClassTeacher || false;
-    const classSections = teacher.teachingInfo?.classSections || [];
-
-    let totalStudents = 0;
-    let studentIds = [];
-
-    if (classSections.length > 0) {
-        const classFilter = buildClassSectionFilter(classSections);
-
-        studentIds = await StudentAcademic.find({ $or: classFilter }).distinct(
-            "userId",
-        );
-
-        totalStudents = studentIds.length;
-    }
-
-    const pendingLeaves = studentIds.length
-        ? await LeaveRequest.countDocuments({
-            applicantId: { $in: studentIds },
-            status: "pending",
-            currentLevel: 1,
-        })
-        : 0;
-
-    res.json({
-        success: true,
-        data: {
-            totalStudents,
-            pendingLeaves,
-            isClassTeacher,
-            assignedClasses: classSections,
-            subjects: teacher.teachingInfo?.subjects || [],
-        },
-    });
+  const teacher = await User.findById(req.user.id);
+  
+  if (!teacher) {
+    res.status(404);
+    throw new Error("Teacher not found");
+  }
+  
+  const isClassTeacher = teacher.teachingInfo?.isClassTeacher || false;
+  const classSections = teacher.teachingInfo?.classSections || [];
+  
+  let totalStudents = 0;
+  let studentIds = [];
+  
+  if (classSections.length > 0) {
+    const classFilter = buildClassSectionFilter(classSections);
+    studentIds = await StudentAcademic.find({ $or: classFilter }).distinct(
+      "userId",
+    );
+    totalStudents = studentIds.length;
+  }
+  
+  // Also get students from department if needed
+  if (teacher.departmentId && totalStudents === 0) {
+    // If no class sections assigned, get all students in department
+    const deptStudents = await User.find({
+      role: "student",
+      departmentId: teacher.departmentId,
+      isActive: true,
+    }).countDocuments();
+    totalStudents = deptStudents;
+  }
+  
+  const pendingLeaves = studentIds.length
+    ? await LeaveRequest.countDocuments({
+        applicantId: { $in: studentIds },
+        status: "pending",
+        currentLevel: 1,
+      })
+    : 0;
+  
+  res.json({
+    success: true,
+    data: {
+      totalStudents,
+      pendingLeaves,
+      isClassTeacher,
+      assignedClasses: classSections,
+      subjects: teacher.teachingInfo?.subjects || [],
+    },
+  });
 });
 
 // @desc    Get pending leaves
@@ -412,4 +422,127 @@ export const getStudentDetails = asyncHandler(async (req, res) => {
             academicInfo: academic?.academicInfo || null,
         },
     });
+});
+
+
+// @desc Get all leave requests with counts
+// @route GET /api/teacher/leaves/all-with-counts
+// @access Private/Teacher
+export const getAllLeavesWithCounts = asyncHandler(async (req, res) => {
+  const teacher = await User.findById(req.user.id);
+  
+  if (!teacher) {
+    res.status(404);
+    throw new Error("Teacher not found");
+  }
+  
+  // Calculate 30 days ago
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  let studentIds = [];
+  
+  // Get all students in teacher's department
+  if (teacher.departmentId) {
+    const students = await User.find({
+      role: "student",
+      departmentId: teacher.departmentId,
+    }).select("_id");
+    studentIds = students.map((s) => s._id);
+  }
+  
+  // Also check class sections if available
+  const classSections = teacher.teachingInfo?.classSections || [];
+  if (classSections.length > 0) {
+    const classFilter = classSections.map((cs) => {
+      const [cls, section] = cs.split("-");
+      return {
+        "academicInfo.class": cls,
+        "academicInfo.section": section,
+      };
+    });
+    
+    const classStudents = await StudentAcademic.find({
+      $or: classFilter,
+    }).distinct("userId");
+    
+    // Merge with department students (avoid duplicates)
+    const classStudentIds = classStudents.map((id) => id.toString());
+    const existingIds = studentIds.map((id) => id.toString());
+    
+    classStudentIds.forEach((id) => {
+      if (!existingIds.includes(id)) {
+        studentIds.push(new mongoose.Types.ObjectId(id));
+      }
+    });
+  }
+  
+  if (studentIds.length === 0) {
+    return res.json({
+      success: true,
+      data: [],
+      counts: {
+        pending: 0,
+        approved: 0,
+        rejected: 0,
+        total: 0
+      }
+    });
+  }
+  
+  // Get all leaves from last 30 days
+  const leaves = await LeaveRequest.find({
+    applicantId: { $in: studentIds },
+    createdAt: { $gte: thirtyDaysAgo },
+  })
+    .populate(
+      "applicantId",
+      "personalInfo.firstName personalInfo.lastName userId",
+    )
+    .populate("leaveType", "name color")
+    .populate(
+      "approvals.approverId",
+      "personalInfo.firstName personalInfo.lastName role",
+    )
+    .sort({ createdAt: -1 });
+  
+  // Calculate counts
+  const pending = leaves.filter(l => 
+    l.status === "pending" || l.status === "approved_by_teacher"
+  ).length;
+  
+  const approved = leaves.filter(l => 
+    l.status === "approved" || 
+    l.status === "approved_by_hod" || 
+    l.finalStatus === "approved"
+  ).length;
+  
+  const rejected = leaves.filter(l => 
+    l.status === "rejected" || l.finalStatus === "rejected"
+  ).length;
+  
+  // Group leaves by status
+  const grouped = {
+    pending: leaves.filter(l => l.status === "pending" || l.status === "approved_by_teacher"),
+    approved: leaves.filter(l => 
+      l.status === "approved" || 
+      l.status === "approved_by_hod" || 
+      l.finalStatus === "approved"
+    ),
+    rejected: leaves.filter(l => 
+      l.status === "rejected" || l.finalStatus === "rejected"
+    ),
+  };
+  
+  res.json({
+    success: true,
+    data: leaves,
+    grouped: grouped,
+    counts: {
+      pending,
+      approved,
+      rejected,
+      total: leaves.length
+    }
+  });
 });

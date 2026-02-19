@@ -13,8 +13,9 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { useAuth } from "../../contexts/AuthContext";
+import { useLeave } from "../../contexts/LeaveContext"; // Add this import
 
-// Modified StatCard - removed onPress to disable clickability
+// StatCard component (unchanged)
 const StatCard = ({ icon, title, value, color }) => (
   <View style={[styles.statCard, { borderLeftColor: color }]}>
     <View style={[styles.iconContainer, { backgroundColor: color + "20" }]}>
@@ -27,101 +28,91 @@ const StatCard = ({ icon, title, value, color }) => (
   </View>
 );
 
-// Modified LeaveCard for horizontal design - removed buttons
-const LeaveCard = ({ leave, onPress }) => (
-  <TouchableOpacity style={styles.horizontalLeaveCard} onPress={() => onPress(leave)}>
-    <View style={styles.horizontalCardContent}>
-      <View style={styles.horizontalAvatarContainer}>
-        <View style={styles.horizontalAvatar}>
-          <Text style={styles.horizontalAvatarText}>
-            {leave.applicantId?.personalInfo?.firstName?.charAt(0) || ""}
-            {leave.applicantId?.personalInfo?.lastName?.charAt(0) || ""}
-          </Text>
-        </View>
-      </View>
-      
-      <View style={styles.horizontalCardDetails}>
-        <View style={styles.horizontalRow}>
-          <Text style={styles.horizontalStudentName} numberOfLines={1}>
-            {leave.applicantId?.personalInfo?.firstName || ""} {leave.applicantId?.personalInfo?.lastName || ""}
-          </Text>
-          <View
-            style={[
-              styles.horizontalStatusBadge,
-              { backgroundColor: getStatusColor(leave.status) },
-            ]}
-          >
-            <Text style={styles.horizontalStatusText}>
-              {leave.status?.replace(/_/g, " ")}
+// LeaveCard component (unchanged)
+const LeaveCard = ({ leave, onPress }) => {
+  const getStatusColor = (status) => {
+    const colors = {
+      "pending": "#F59E0B",
+      "approved_by_teacher": "#3B82F6",
+    };
+    return colors[status] || "#6B7280";
+  };
+
+  const formatDate = (date) => {
+    if (!date) return "N/A";
+    try {
+      return new Date(date).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+    } catch (e) {
+      return "Invalid date";
+    }
+  };
+
+  return (
+    <TouchableOpacity style={styles.horizontalLeaveCard} onPress={() => onPress(leave)}>
+      <View style={styles.horizontalCardContent}>
+        <View style={styles.horizontalAvatarContainer}>
+          <View style={styles.horizontalAvatar}>
+            <Text style={styles.horizontalAvatarText}>
+              {leave.applicantId?.personalInfo?.firstName?.charAt(0) || ""}
+              {leave.applicantId?.personalInfo?.lastName?.charAt(0) || ""}
             </Text>
           </View>
         </View>
         
-        <Text style={styles.horizontalLeaveType} numberOfLines={1}>
-          {leave.leaveType?.name || "Leave"} • {leave.dateRange?.days || 0} day(s)
-        </Text>
-        
-        <Text style={styles.horizontalLeaveDates} numberOfLines={1}>
-          {formatDate(leave.dateRange?.from)} - {formatDate(leave.dateRange?.to)}
-        </Text>
+        <View style={styles.horizontalCardDetails}>
+          <View style={styles.horizontalRow}>
+            <Text style={styles.horizontalStudentName} numberOfLines={1}>
+              {leave.applicantId?.personalInfo?.firstName || ""} {leave.applicantId?.personalInfo?.lastName || ""}
+            </Text>
+            <View
+              style={[
+                styles.horizontalStatusBadge,
+                { backgroundColor: getStatusColor(leave.status) },
+              ]}
+            >
+              <Text style={styles.horizontalStatusText}>
+                {leave.status === "pending" ? "Pending" : "Approved"}
+              </Text>
+            </View>
+          </View>
+          
+          <Text style={styles.horizontalLeaveType} numberOfLines={1}>
+            {leave.leaveType?.name || "Leave"} • {leave.dateRange?.days || 0} day(s)
+          </Text>
+          
+          <Text style={styles.horizontalLeaveDates} numberOfLines={1}>
+            {formatDate(leave.dateRange?.from)} - {formatDate(leave.dateRange?.to)}
+          </Text>
+        </View>
       </View>
-    </View>
-  </TouchableOpacity>
-);
-
-const DetailRow = ({ icon, label, value }) => (
-  <View style={styles.detailRow}>
-    <Ionicons name={icon} size={16} color="#64748B" />
-    <Text style={styles.detailLabel}>{label}:</Text>
-    <Text style={styles.detailValue} numberOfLines={1}>
-      {value || "N/A"}
-    </Text>
-  </View>
-);
-
-const getStatusColor = (status) => {
-  const colors = {
-    "pending": "#F59E0B",
-    "approved_by_teacher": "#3B82F6",
-    "approved_by_hod": "#10B981",
-    "approved": "#10B981",
-    "rejected": "#EF4444",
-  };
-  return colors[status] || "#6B7280";
-};
-
-const formatDate = (date) => {
-  if (!date) return "N/A";
-  try {
-    return new Date(date).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  } catch (e) {
-    return "Invalid date";
-  }
+    </TouchableOpacity>
+  );
 };
 
 const TeacherDashboard = ({ navigation }) => {
   const { logout } = useAuth();
+  const { 
+    pendingLeaves, 
+    approvedLeaves, 
+    stats, 
+    loading: leavesLoading, 
+    fetchAllLeaves,
+    approveLeave,
+    rejectLeave
+  } = useLeave();
+  
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
+  const [dashboardStats, setDashboardStats] = useState({
     totalStudents: 0,
-    pendingLeaves: 0,
-    approvedLeaves: 0,
-    rejectedLeaves: 0,
     assignedClasses: [],
     subjects: [],
     isClassTeacher: false,
   });
-  const [pendingLeaves, setPendingLeaves] = useState([]);
   const [profile, setProfile] = useState(null);
-
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
 
   const loadDashboardData = useCallback(async () => {
     try {
@@ -129,39 +120,20 @@ const TeacherDashboard = ({ navigation }) => {
       
       // Fetch dashboard stats
       const statsRes = await api.get("/teacher/dashboard-stats");
-      console.log("Stats response:", statsRes.data);
-      
-      // Fetch pending leaves
-      const leavesRes = await api.get("/teacher/leave-requests");
-      console.log("Leaves response:", leavesRes.data);
       
       // Fetch profile
       const profileRes = await api.get("/teacher/profile");
       
-      // Calculate approved and rejected leaves from the leaves data
-      const allLeaves = leavesRes.data.data || [];
-      const approvedLeaves = allLeaves.filter(
-        leave => leave.status === "approved" || 
-                leave.status === "approved_by_teacher" || 
-                leave.status === "approved_by_hod" || 
-                leave.finalStatus === "approved"
-      ).length;
+      // Fetch leaves data through context
+      await fetchAllLeaves();
       
-      const rejectedLeaves = allLeaves.filter(
-        leave => leave.status === "rejected" || leave.finalStatus === "rejected"
-      ).length;
-      
-      setStats({
-        ...statsRes.data.data,
-        approvedLeaves: approvedLeaves,
-        rejectedLeaves: rejectedLeaves,
+      setDashboardStats({
         totalStudents: statsRes.data.data?.totalStudents || 0,
-        pendingLeaves: statsRes.data.data?.pendingLeaves || 0,
+        assignedClasses: statsRes.data.data?.assignedClasses || [],
+        subjects: statsRes.data.data?.subjects || [],
+        isClassTeacher: statsRes.data.data?.isClassTeacher || false,
       });
       
-      setPendingLeaves(allLeaves.filter(leave => 
-        leave.status === "pending" || leave.status === "approved_by_teacher"
-      ));
       setProfile(profileRes.data.data);
     } catch (error) {
       console.error("Dashboard load error:", error);
@@ -170,25 +142,30 @@ const TeacherDashboard = ({ navigation }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [fetchAllLeaves]);
 
-  const onRefresh = () => {
-    setRefreshing(true);
+  useEffect(() => {
     loadDashboardData();
+    
+    // Add focus listener to refresh data when tab is focused
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchAllLeaves();
+    });
+
+    return unsubscribe;
+  }, [navigation, fetchAllLeaves, loadDashboardData]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadDashboardData();
   };
 
   const handleApproveLeave = async (leaveId) => {
-    try {
-      await api.post(`/teacher/leaves/${leaveId}/approve`, {
-        remarks: "Approved by teacher",
-      });
+    const result = await approveLeave(leaveId);
+    if (result.success) {
       Alert.alert("Success", "Leave approved and forwarded to HOD");
-      loadDashboardData();
-    } catch (error) {
-      Alert.alert(
-        "Error",
-        error.response?.data?.message || "Failed to approve",
-      );
+    } else {
+      Alert.alert("Error", result.message);
     }
   };
 
@@ -202,17 +179,11 @@ const TeacherDashboard = ({ navigation }) => {
           text: "Reject",
           style: "destructive",
           onPress: async (reason) => {
-            try {
-              await api.post(`/teacher/leaves/${leaveId}/reject`, {
-                reason: reason || "Rejected by class teacher",
-              });
+            const result = await rejectLeave(leaveId, reason || "Rejected by teacher");
+            if (result.success) {
               Alert.alert("Success", "Leave rejected");
-              loadDashboardData();
-            } catch (error) {
-              Alert.alert(
-                "Error",
-                error.response?.data?.message || "Failed to reject",
-              );
+            } else {
+              Alert.alert("Error", result.message);
             }
           },
         },
@@ -233,32 +204,34 @@ const TeacherDashboard = ({ navigation }) => {
     navigation.navigate("TeacherLeaveRequests");
   };
 
-  const navigateToLeaveHistory = () => {
-    navigation.navigate("TeacherLeaveHistory");
-  };
-
-  // Handle leave card press - navigate to leave details with action sheet
   const handleLeavePress = (leave) => {
-    Alert.alert(
-      "Leave Request",
-      `What would you like to do with ${leave.applicantId?.personalInfo?.firstName}'s leave request?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Approve", 
-          onPress: () => handleApproveLeave(leave._id),
-          style: "default"
-        },
-        { 
-          text: "Reject", 
-          onPress: () => handleRejectLeave(leave._id),
-          style: "destructive"
-        },
-      ]
-    );
+    if (leave.status === "pending") {
+      Alert.alert(
+        "Leave Request",
+        `What would you like to do with ${leave.applicantId?.personalInfo?.firstName}'s leave request?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          { 
+            text: "Approve", 
+            onPress: () => handleApproveLeave(leave._id),
+            style: "default"
+          },
+          { 
+            text: "Reject", 
+            onPress: () => handleRejectLeave(leave._id),
+            style: "destructive"
+          },
+        ]
+      );
+    } else {
+      Alert.alert(
+        "Leave Request",
+        `This leave request has been approved by you and is waiting for HOD approval.`,
+        [{ text: "OK" }]
+      );
+    }
   };
 
-  // Immediate logout without confirmation
   const handleLogout = async () => {
     try {
       await logout();
@@ -267,13 +240,16 @@ const TeacherDashboard = ({ navigation }) => {
     }
   };
 
-  if (loading) {
+  if (loading && !profile) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0D9488" />
       </View>
     );
   }
+
+  // Combine pending and approved leaves for the horizontal scroll
+  const allPendingRequests = [...pendingLeaves, ...approvedLeaves];
 
   return (
     <ScrollView
@@ -282,7 +258,7 @@ const TeacherDashboard = ({ navigation }) => {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      {/* Header with Teal Background */}
+      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <View style={styles.headerTextContainer}>
@@ -291,7 +267,7 @@ const TeacherDashboard = ({ navigation }) => {
               {profile?.personalInfo?.firstName} {profile?.personalInfo?.lastName}
             </Text>
             <View style={styles.badgeContainer}>
-              {stats.isClassTeacher && (
+              {dashboardStats.isClassTeacher && (
                 <View style={[styles.badge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
                   <Ionicons name="star" size={12} color="#FFD700" />
                   <Text style={styles.badgeText}>Class Teacher</Text>
@@ -300,7 +276,7 @@ const TeacherDashboard = ({ navigation }) => {
               <View style={[styles.badge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
                 <Ionicons name="book" size={12} color="#fff" />
                 <Text style={styles.badgeText}>
-                  {stats.subjects?.length || 0} Subjects
+                  {dashboardStats.subjects?.length || 0} Subjects
                 </Text>
               </View>
             </View>
@@ -312,44 +288,44 @@ const TeacherDashboard = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Stats Grid - All non-clickable now */}
+      {/* Stats Grid */}
       <View style={styles.statsGrid}>
         <StatCard
           icon="people"
           title="My Students"
-          value={stats.totalStudents}
+          value={dashboardStats.totalStudents}
           color="#0D9488"
         />
         <StatCard
           icon="time"
           title="Pending"
-          value={stats.pendingLeaves}
+          value={stats.pending}
           color="#F59E0B"
         />
         <StatCard
           icon="checkmark-circle"
           title="Approved"
-          value={stats.approvedLeaves}
-          color="#10B981"
+          value={stats.approved}
+          color="#3B82F6"
         />
         <StatCard
           icon="close-circle"
           title="Rejected"
-          value={stats.rejectedLeaves}
+          value={stats.rejected}
           color="#EF4444"
         />
       </View>
 
-      {/* Assigned Classes - This one remains clickable if needed */}
-      {stats.assignedClasses?.length > 0 && (
+      {/* Assigned Classes */}
+      {dashboardStats.assignedClasses?.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>My Classes</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {stats.assignedClasses.map((cls, index) => (
+            {dashboardStats.assignedClasses.map((cls, index) => (
               <TouchableOpacity 
                 key={index} 
                 style={styles.classChip}
-                onPress={() => {}} // Add navigation if needed
+                onPress={() => {}}
               >
                 <Text style={styles.classChipText}>Class {cls}</Text>
               </TouchableOpacity>
@@ -392,7 +368,7 @@ const TeacherDashboard = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Pending Leaves Section - HORIZONTAL SCROLL */}
+      {/* Pending Leaves Section */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Pending Leave Approvals</Text>
@@ -401,7 +377,7 @@ const TeacherDashboard = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {pendingLeaves.length === 0 ? (
+        {allPendingRequests.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="checkmark-circle" size={48} color="#10B981" />
             <Text style={styles.emptyText}>No pending leave requests</Text>
@@ -412,7 +388,7 @@ const TeacherDashboard = ({ navigation }) => {
             showsHorizontalScrollIndicator={false}
             style={styles.horizontalScrollView}
           >
-            {pendingLeaves.map((leave) => (
+            {allPendingRequests.map((leave) => (
               <LeaveCard
                 key={leave._id}
                 leave={leave}
@@ -426,6 +402,7 @@ const TeacherDashboard = ({ navigation }) => {
   );
 };
 
+// Styles remain the same as before
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -579,7 +556,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#64748B",
   },
-  // Horizontal scroll view styles
   horizontalScrollView: {
     marginBottom: 8,
   },
@@ -685,24 +661,6 @@ const styles = StyleSheet.create({
     color: "#475569",
     fontWeight: "600",
     textAlign: "center",
-  },
-  // Keep these for reference but they're not used in the new design
-  detailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  detailLabel: {
-    fontSize: 13,
-    color: "#64748B",
-    marginLeft: 6,
-    width: 60,
-  },
-  detailValue: {
-    flex: 1,
-    fontSize: 13,
-    color: "#1E293B",
-    fontWeight: "500",
   },
 });
 

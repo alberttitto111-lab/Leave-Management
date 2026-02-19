@@ -1,5 +1,5 @@
 // screens/teacher/TeacherRejectedScreen.js
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
@@ -10,10 +10,10 @@ import {
   RefreshControl,
   StatusBar,
   Platform,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import api from "../../services/api";
-import { COLORS } from "../../utils/constants";
+import { useLeave } from "../../contexts/LeaveContext";
 
 const HEADER_HEIGHT = 100;
 
@@ -21,22 +21,14 @@ const RejectedCard = ({ leave, onPress }) => {
   const student = leave.applicantId;
   const leaveType = leave.leaveType;
 
-  const getStatusColor = (status) => {
-    if (status === "rejected") {
-      return "#EF4444";
-    }
-    return "#6B7280";
-  };
-
   const formatDate = (date) => {
     if (!date) return "N/A";
     return new Date(date).toLocaleDateString();
   };
 
-  // Find rejection reason from approvals
+  // Find rejection reason
   const getRejectionReason = () => {
     if (leave.rejectionReason) return leave.rejectionReason;
-    
     const rejection = leave.approvals?.find(a => a.status === "rejected");
     return rejection?.remarks || "No reason provided";
   };
@@ -107,39 +99,26 @@ const RejectedCard = ({ leave, onPress }) => {
 };
 
 const TeacherRejectedScreen = ({ navigation }) => {
-  const [leaves, setLeaves] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const loadRejectedLeaves = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get("/teacher/leaves/history-30days");
-      
-      // Filter for rejected leaves
-      const allLeaves = res.data.data || [];
-      const rejectedLeaves = allLeaves.filter(leave => 
-        leave.status === "rejected" || 
-        leave.finalStatus === "rejected"
-      );
-      
-      setLeaves(rejectedLeaves);
-    } catch (err) {
-      console.error("Load rejected leaves error:", err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const { rejectedLeaves, loading, fetchAllLeaves } = useLeave();
+  
+  const [refreshing, setRefreshing] = React.useState(false);
 
   useEffect(() => {
-    loadRejectedLeaves();
-  }, []);
+    fetchAllLeaves();
+    
+    // Add focus listener to refresh when tab is focused
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchAllLeaves();
+    });
 
-  const onRefresh = useCallback(() => {
+    return unsubscribe;
+  }, [navigation, fetchAllLeaves]);
+
+  const onRefresh = async () => {
     setRefreshing(true);
-    loadRejectedLeaves();
-  }, []);
+    await fetchAllLeaves();
+    setRefreshing(false);
+  };
 
   const handleLeavePress = (leave) => {
     Alert.alert(
@@ -149,7 +128,7 @@ const TeacherRejectedScreen = ({ navigation }) => {
     );
   };
 
-  if (loading) {
+  if (loading && rejectedLeaves.length === 0) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#0D9488" />
@@ -173,7 +152,7 @@ const TeacherRejectedScreen = ({ navigation }) => {
           <View style={styles.headerTitleContainer}>
             <Text style={styles.headerTitle}>Rejected Leaves</Text>
             <Text style={styles.headerSubtitle}>
-              {leaves.length} rejected request{leaves.length !== 1 ? 's' : ''}
+              {rejectedLeaves.length} rejected
             </Text>
           </View>
           <View style={{ width: 40 }} />
@@ -181,7 +160,7 @@ const TeacherRejectedScreen = ({ navigation }) => {
       </View>
 
       <FlatList
-        data={leaves}
+        data={rejectedLeaves}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => (
           <RejectedCard leave={item} onPress={handleLeavePress} />
@@ -193,7 +172,7 @@ const TeacherRejectedScreen = ({ navigation }) => {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="close-circle-outline" size={64} color="#CBD5E1" />
-            <Text style={styles.emptyText}>No rejected leave requests</Text>
+            <Text style={styles.emptyText}>No rejected leaves</Text>
           </View>
         }
       />
@@ -201,6 +180,7 @@ const TeacherRejectedScreen = ({ navigation }) => {
   );
 };
 
+// Styles remain the same
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -270,6 +250,7 @@ const styles = StyleSheet.create({
   studentInfo: {
     flexDirection: "row",
     alignItems: "center",
+    flex: 1,
   },
   avatar: {
     width: 44,
@@ -303,7 +284,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     color: "#fff",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "600",
   },
   cardBody: {
@@ -362,8 +343,9 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     marginTop: 16,
-    fontSize: 15,
-    color: "#94A3B8",
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#4B5563",
   },
 });
 

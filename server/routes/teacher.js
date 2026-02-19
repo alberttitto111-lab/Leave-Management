@@ -24,6 +24,7 @@ import {
   rejectLeave,
   getStudents,
   getStudentDetails,
+   getAllLeavesWithCounts,
 } from "../controllers/teacherController.js";
 
 const router = express.Router();
@@ -52,6 +53,19 @@ const buildClassSectionFilter = (classSections = []) => {
     };
   });
 };
+
+// Add this new route
+router.get("/leaves/all-with-counts", getAllLeavesWithCounts);
+
+// Keep existing routes
+router.get("/dashboard-stats", getDashboardStats);
+router.get("/leaves/pending", getPendingLeaves);
+router.get("/leaves/history", getLeaveHistory);
+router.get("/leaves/:leaveId", getLeaveDetails);
+router.post("/leaves/:leaveId/approve", approveLeave);
+router.post("/leaves/:leaveId/reject", rejectLeave);
+router.get("/students", getStudents);
+router.get("/students/:id", getStudentDetails);
 
 /* =====================================================
    GET /api/teacher/dashboard-stats

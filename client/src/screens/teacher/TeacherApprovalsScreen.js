@@ -1,5 +1,5 @@
 // screens/teacher/TeacherApprovalsScreen.js
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
@@ -9,25 +9,17 @@ import {
   ActivityIndicator,
   RefreshControl,
   StatusBar,
-    Alert,
-    Platform,
+  Platform,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import api from "../../services/api";
-import { COLORS } from "../../utils/constants";
+import { useLeave } from "../../contexts/LeaveContext";
 
 const HEADER_HEIGHT = 100;
 
 const ApprovalCard = ({ leave, onPress }) => {
   const student = leave.applicantId;
   const leaveType = leave.leaveType;
-
-  const getStatusColor = (status) => {
-    if (status === "approved" || status === "approved_by_hod" || status === "approved_by_teacher") {
-      return "#10B981";
-    }
-    return "#6B7280";
-  };
 
   const formatDate = (date) => {
     if (!date) return "N/A";
@@ -38,8 +30,8 @@ const ApprovalCard = ({ leave, onPress }) => {
     <TouchableOpacity style={styles.card} onPress={() => onPress(leave)}>
       <View style={styles.cardHeader}>
         <View style={styles.studentInfo}>
-          <View style={[styles.avatar, { backgroundColor: "#10B98120" }]}>
-            <Text style={[styles.avatarText, { color: "#10B981" }]}>
+          <View style={[styles.avatar, { backgroundColor: "#3B82F620" }]}>
+            <Text style={[styles.avatarText, { color: "#3B82F6" }]}>
               {student?.personalInfo?.firstName?.[0] || ""}
               {student?.personalInfo?.lastName?.[0] || ""}
             </Text>
@@ -51,9 +43,9 @@ const ApprovalCard = ({ leave, onPress }) => {
             <Text style={styles.studentId}>{student?.userId}</Text>
           </View>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: "#10B981" }]}>
+        <View style={[styles.statusBadge, { backgroundColor: "#3B82F6" }]}>
           <Ionicons name="checkmark" size={12} color="#fff" />
-          <Text style={styles.statusText}>Approved</Text>
+          <Text style={styles.statusText}>Approved by You</Text>
         </View>
       </View>
 
@@ -81,63 +73,48 @@ const ApprovalCard = ({ leave, onPress }) => {
         <Text style={styles.dateText}>
           Applied: {formatDate(leave.createdAt)}
         </Text>
-        {leave.approvals?.length > 0 && (
-          <Text style={styles.approvedByText}>
-            Approved by: {leave.approvals[leave.approvals.length - 1]?.approverId?.personalInfo?.firstName || "Teacher"}
+        <View style={styles.footerRight}>
+          <Ionicons name="time-outline" size={14} color="#9CA3AF" />
+          <Text style={styles.waitingText}>
+            Waiting for HOD
           </Text>
-        )}
+        </View>
       </View>
     </TouchableOpacity>
   );
 };
 
 const TeacherApprovalsScreen = ({ navigation }) => {
-  const [leaves, setLeaves] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const loadApprovedLeaves = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get("/teacher/leaves/history-30days");
-      
-      // Filter for approved leaves
-      const allLeaves = res.data.data || [];
-      const approvedLeaves = allLeaves.filter(leave => 
-        leave.status === "approved" || 
-        leave.status === "approved_by_hod" || 
-        leave.status === "approved_by_teacher" ||
-        leave.finalStatus === "approved"
-      );
-      
-      setLeaves(approvedLeaves);
-    } catch (err) {
-      console.error("Load approved leaves error:", err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const { approvedLeaves, loading, fetchAllLeaves } = useLeave();
+  
+  const [refreshing, setRefreshing] = React.useState(false);
 
   useEffect(() => {
-    loadApprovedLeaves();
-  }, []);
+    fetchAllLeaves();
+    
+    // Add focus listener to refresh when tab is focused
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchAllLeaves();
+    });
 
-  const onRefresh = useCallback(() => {
+    return unsubscribe;
+  }, [navigation, fetchAllLeaves]);
+
+  const onRefresh = async () => {
     setRefreshing(true);
-    loadApprovedLeaves();
-  }, []);
+    await fetchAllLeaves();
+    setRefreshing(false);
+  };
 
   const handleLeavePress = (leave) => {
-    // Navigate to leave details or show options
     Alert.alert(
-      "Leave Details",
-      `Leave request by ${leave.applicantId?.personalInfo?.firstName}`,
+      "Approved Leave Details",
+      `Leave request by ${leave.applicantId?.personalInfo?.firstName} was approved by you and is waiting for HOD approval.`,
       [{ text: "OK" }]
     );
   };
 
-  if (loading) {
+  if (loading && approvedLeaves.length === 0) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#0D9488" />
@@ -161,7 +138,7 @@ const TeacherApprovalsScreen = ({ navigation }) => {
           <View style={styles.headerTitleContainer}>
             <Text style={styles.headerTitle}>Approved Leaves</Text>
             <Text style={styles.headerSubtitle}>
-              {leaves.length} approved request{leaves.length !== 1 ? 's' : ''}
+              {approvedLeaves.length} approved by you
             </Text>
           </View>
           <View style={{ width: 40 }} />
@@ -169,7 +146,7 @@ const TeacherApprovalsScreen = ({ navigation }) => {
       </View>
 
       <FlatList
-        data={leaves}
+        data={approvedLeaves}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => (
           <ApprovalCard leave={item} onPress={handleLeavePress} />
@@ -181,7 +158,10 @@ const TeacherApprovalsScreen = ({ navigation }) => {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="checkmark-circle-outline" size={64} color="#CBD5E1" />
-            <Text style={styles.emptyText}>No approved leave requests</Text>
+            <Text style={styles.emptyText}>No leaves approved by you</Text>
+            <Text style={styles.emptySubText}>
+              Leaves you approve will appear here
+            </Text>
           </View>
         }
       />
@@ -189,6 +169,7 @@ const TeacherApprovalsScreen = ({ navigation }) => {
   );
 };
 
+// Styles remain the same
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -258,6 +239,7 @@ const styles = StyleSheet.create({
   studentInfo: {
     flexDirection: "row",
     alignItems: "center",
+    flex: 1,
   },
   avatar: {
     width: 44,
@@ -291,7 +273,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     color: "#fff",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "600",
   },
   cardBody: {
@@ -317,6 +299,7 @@ const styles = StyleSheet.create({
   cardFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: "#F3F4F6",
@@ -325,9 +308,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#9CA3AF",
   },
-  approvedByText: {
+  footerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  waitingText: {
     fontSize: 12,
-    color: "#10B981",
+    color: "#3B82F6",
     fontWeight: "500",
   },
   emptyState: {
@@ -336,8 +324,15 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     marginTop: 16,
-    fontSize: 15,
-    color: "#94A3B8",
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#4B5563",
+  },
+  emptySubText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#9CA3AF",
+    textAlign: "center",
   },
 });
 
