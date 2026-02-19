@@ -37,7 +37,7 @@ export const createUser = asyncHandler(async (req, res, next) => {
     role,
     isFirstLogin: true,
     personalInfo,
-    departmentId: role !== "admin" ? departmentId : null,
+    departmentId: role !== "admin" ? departmentId : null,   // this saves the department id in the user collection
     assignedClasses: assignTo?.classes || [],
   });
 
@@ -75,6 +75,7 @@ export const createUser = asyncHandler(async (req, res, next) => {
       academicInfo: {
         ...academicInfo,
         rollNumber,
+        departmentId: departmentId,  // this saves the department id in the academic info collection for easy access
       },
       classTeacherId: classTeacher?._id || null,
       hodId: hod?._id || null,

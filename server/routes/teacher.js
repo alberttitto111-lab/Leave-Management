@@ -432,12 +432,16 @@ router.get("/students", async (req, res) => {
 /* ================================
    GET SINGLE STUDENT DETAILS
 ================================ */
+// In server/routes/teacher.js - Update the get student details route
+
 router.get("/students/:id", protect, authorize("teacher"), async (req, res) => {
   try {
     const student = await User.findOne({
       _id: req.params.id,
       role: "student",
-    }).select("-password");
+    })
+    .select("-password")
+    .populate("departmentId", "name code"); // Add this line to populate department
 
     if (!student) {
       return res.status(404).json({

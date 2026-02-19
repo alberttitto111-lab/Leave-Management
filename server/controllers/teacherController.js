@@ -339,89 +339,114 @@ export const updateProfile = asyncHandler(async (req, res) => {
 });
 
 // STUDENT MANAGEMENT 
-// @desc    Get students
-// @route   GET /api/teacher/students
-// @access  Private/Teacher
+// @desc Get students
+// @route GET /api/teacher/students
+// @access Private/Teacher
 export const getStudents = asyncHandler(async (req, res) => {
-    const teacher = await User.findById(req.user.id);
-
-    if (!teacher) {
-        res.status(404);
-        throw new Error("Teacher not found");
-    }
-
-    if (!teacher.departmentId) {
-        return res.json({ success: true, data: [] });
-    }
-
-    // 1️⃣ get all student users in same department
-    const studentUsers = await User.find({
-        role: "student",
-        departmentId: teacher.departmentId,
-        isActive: true,
-    }).select("_id userId personalInfo");
-
-    const userIds = studentUsers.map((u) => u._id);
-
-    // 2️⃣ get academic records
-    const academics = await StudentAcademic.find({
-        userId: { $in: userIds },
-    }).lean();
-
-    const academicMap = new Map();
-    academics.forEach((a) => {
-        academicMap.set(String(a.userId), a.academicInfo);
+  const teacher = await User.findById(req.user.id);
+  
+  if (!teacher) {
+    res.status(404);
+    throw new Error("Teacher not found");
+  }
+  
+  if (!teacher.departmentId) {
+    return res.json({ 
+      success: true, 
+      count: 0,
+      data: [] 
     });
-
-    // 3️⃣ merge
-    const students = studentUsers.map((u) => ({
-        _id: u._id,
-        userId: u.userId,
-        personalInfo: u.personalInfo,
-        academicInfo: academicMap.get(String(u._id)) || {},
-    }));
-
-    // 4️⃣ sort by section + roll
-    students.sort((a, b) => {
-        const s1 = a.academicInfo.section || "";
-        const s2 = b.academicInfo.section || "";
-        if (s1 !== s2) return s1.localeCompare(s2);
-
-        return (a.academicInfo.rollNumber || 0) - (b.academicInfo.rollNumber || 0);
-    });
-
-    res.json({
-        success: true,
-        count: students.length,
-        data: students,
-    });
+  }
+  
+  // Get all student users in same department with populated department info
+  const studentUsers = await User.find({
+    role: "student",
+    departmentId: teacher.departmentId,
+    isActive: true,
+  })
+  .select("_id userId personalInfo departmentId")
+  .populate("departmentId", "name code"); // Populate department for each student
+  
+  const userIds = studentUsers.map((u) => u._id);
+  
+  // Get academic records
+  const academics = await StudentAcademic.find({
+    userId: { $in: userIds },
+  }).lean();
+  
+  const academicMap = new Map();
+  academics.forEach((a) => {
+    academicMap.set(String(a.userId), a.academicInfo);
+  });
+  
+  // Merge data
+  const students = studentUsers.map((u) => ({
+    _id: u._id,
+    userId: u.userId,
+    personalInfo: u.personalInfo,
+    departmentId: u.departmentId, // This will now be the populated department object
+    academicInfo: academicMap.get(String(u._id)) || {},
+  }));
+  
+  // Sort by section + roll
+  students.sort((a, b) => {
+    const s1 = a.academicInfo.section || "";
+    const s2 = b.academicInfo.section || "";
+    if (s1 !== s2) return s1.localeCompare(s2);
+    return (a.academicInfo.rollNumber || 0) - (b.academicInfo.rollNumber || 0);
+  });
+  
+  res.json({
+    success: true,
+    count: students.length,
+    data: students,
+  });
 });
 
-// @desc    Get single student details
-// @route   GET /api/teacher/students/:id
-// @access  Private/Teacher
+// @desc Get single student details
+// @route GET /api/teacher/students/:id
+// @access Private/Teacher
 export const getStudentDetails = asyncHandler(async (req, res) => {
-    const student = await User.findOne({
-        _id: req.params.id,
-        role: "student",
-    }).select("-password");
+  const student = await User.findOne({
+    _id: req.params.id,
+    role: "student",
+  })
+  .select("-password")
+  .populate({
+    path: "departmentId",
+    select: "name code description", // Populate all department fields
+    model: "Department"
+  });
 
-    if (!student) {
-        res.status(404);
-        throw new Error("Student not found");
-    }
+  if (!student) {
+    res.status(404);
+    throw new Error("Student not found");
+  }
 
-    const academic = await StudentAcademic.findOne({
-        userId: student._id,
-    });
+  // Also get academic info with populated fields if needed
+  const academic = await StudentAcademic.findOne({
+    userId: student._id,
+  })
+  .populate("classTeacherId", "personalInfo.firstName personalInfo.lastName")
+  .populate("hodId", "personalInfo.firstName personalInfo.lastName");
 
-    res.json({
-        success: true,
-        data: {
-            ...student.toObject(),
-            academicInfo: academic?.academicInfo || null,
-        },
-    });
+  // Log to debug
+  console.log("Student with populated department:", JSON.stringify({
+    id: student._id,
+    userId: student.userId,
+    departmentId: student.departmentId,
+    departmentName: student.departmentId?.name
+  }, null, 2));
+
+  res.json({
+    success: true,
+    data: {
+      ...student.toObject(),
+      academicInfo: academic?.academicInfo || null,
+      classTeacher: academic?.classTeacherId || null,
+      hod: academic?.hodId || null,
+    },
+  });
 });
 
 

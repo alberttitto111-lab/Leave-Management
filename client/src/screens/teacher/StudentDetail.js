@@ -10,12 +10,13 @@ import {
   TouchableOpacity,
   StatusBar,
   Platform,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { COLORS } from "../../utils/constants";
 
-const HEADER_HEIGHT = 100; // Decreased from 200 to 100
+const HEADER_HEIGHT = 100;
 
 const InfoRow = ({ label, value }) => (
   <View style={styles.infoRow}>
@@ -36,10 +37,13 @@ const StudentDetail = ({ route, navigation }) => {
 
   const loadStudent = async () => {
     try {
+      setLoading(true);
       const res = await api.get(`/teacher/students/${studentId}`);
+      console.log("Student data with department:", JSON.stringify(res.data.data.departmentId, null, 2));
       setStudent(res.data.data);
     } catch (err) {
       console.error("Failed to load student:", err);
+      Alert.alert("Error", "Failed to load student details");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -79,7 +83,11 @@ const StudentDetail = ({ route, navigation }) => {
 
   const p = student.personalInfo || {};
   const a = student.academicInfo || {};
+  
+  // Safe access to department data - could be object or ID
   const department = student.departmentId || {};
+  const departmentName = typeof department === 'object' ? department.name : null;
+  const departmentCode = typeof department === 'object' ? department.code : null;
 
   // Format date of birth
   const formatDateOfBirth = (date) => {
@@ -101,7 +109,7 @@ const StudentDetail = ({ route, navigation }) => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0D9488" />
 
-      {/* Fixed Header with Back Button - Reduced Height */}
+      {/* Fixed Header with Back Button */}
       <View style={[styles.header, { backgroundColor: "#0D9488" }]}>
         <View style={styles.headerTop}>
           <TouchableOpacity
@@ -131,7 +139,7 @@ const StudentDetail = ({ route, navigation }) => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* Spacer for fixed header - Adjusted to match new height */}
+        {/* Spacer for fixed header */}
         <View style={{ height: HEADER_HEIGHT + 10 }} />
 
         {/* Account Information */}
@@ -159,16 +167,20 @@ const StudentDetail = ({ route, navigation }) => {
           <InfoRow label="Batch Year" value={a.batchYear?.toString()} />
         </View>
 
-        {/* Department */}
+        {/* Department - Now properly displays the name */}
         <View style={styles.formCard}>
           <SectionHeader title="Department" />
-          <InfoRow label="Department Name" value={department.name || "Not Assigned"} />
-          {department.code && (
-            <InfoRow label="Department Code" value={department.code} />
+          <InfoRow label="Department Name" value={departmentName || "Not Assigned"} />
+          {departmentCode && (
+            <InfoRow label="Department Code" value={departmentCode} />
           )}
+          {/* Optional: Show ID for debugging (remove in production) */}
+          {/* {!departmentName && student.departmentId && (
+            <InfoRow label="Department ID" value={typeof student.departmentId === 'string' ? student.departmentId : 'Invalid'} />
+          )} */}
         </View>
 
-        {/* Personal Information - Converted to read-only format */}
+        {/* Personal Information */}
         <View style={styles.formCard}>
           <SectionHeader title="Personal Information" />
           <InfoRow label="First Name" value={p.firstName} />
@@ -180,7 +192,7 @@ const StudentDetail = ({ route, navigation }) => {
           <InfoRow label="Address" value={p.address} />
         </View>
 
-        {/* Bottom padding for comfortable scrolling */}
+        {/* Bottom padding */}
         <View style={{ height: 40 }} />
       </ScrollView>
     </View>
@@ -198,7 +210,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: COLORS.background,
   },
-  // Header styles - Reduced Height
   header: {
     position: "absolute",
     top: 0,
@@ -240,13 +251,11 @@ const styles = StyleSheet.create({
     opacity: 0.8,
     marginTop: 2,
   },
-  // Scroll content
   scrollContent: {
     paddingHorizontal: 20,
     paddingBottom: 20,
     flexGrow: 1,
   },
-  // Form Card
   formCard: {
     backgroundColor: COLORS.white,
     borderRadius: 24,
@@ -265,7 +274,6 @@ const styles = StyleSheet.create({
     color: "#0D9488",
     marginBottom: 15,
   },
-  // Info Row styling - Used for ALL sections
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",

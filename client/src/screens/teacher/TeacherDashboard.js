@@ -535,7 +535,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   classChip: {
-    backgroundColor: "#E6FFFA",
+    backgroundColor: "#e6fffadc",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
@@ -586,7 +586,7 @@ const styles = StyleSheet.create({
   horizontalAvatar: {
     width: 48,
     height: 48,
-    borderRadius: 10,
+    borderRadius: 24,
     backgroundColor: "#e8f7f3a7",
     justifyContent: "center",
     alignItems: "center",
