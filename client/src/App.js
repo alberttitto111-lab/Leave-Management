@@ -9,6 +9,7 @@ import { COLORS } from "./utils/constants";
 
 import { ToastProvider } from "./contexts/ToastContext";
 import { LeaveProvider } from "./contexts/LeaveContext"; // New import
+import { UserProvider } from "./contexts/UserContext"; // New import
 
 const App = () => {
   const [fontsLoaded, setFontsLoaded] = useState(false);
@@ -26,9 +27,11 @@ const App = () => {
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       <ToastProvider>
         <AuthProvider>
-          <LeaveProvider> 
-            <RootNavigator />
-          </LeaveProvider>
+          <UserProvider>
+            <LeaveProvider> 
+              <RootNavigator />
+            </LeaveProvider>
+          </UserProvider>
         </AuthProvider>
       </ToastProvider>
     </SafeAreaProvider>

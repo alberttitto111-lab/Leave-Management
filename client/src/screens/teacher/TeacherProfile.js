@@ -14,13 +14,15 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
+import { useUser } from "../../contexts/UserContext"; // Add this import
 import { getAccessToken } from "../../utils/storage";
 import { API_BASE_URL } from "../../utils/constants";
 
-const HEADER_HEIGHT = 120;
+const HEADER_HEIGHT = 100;
 
 const TeacherProfile = ({ navigation }) => {
-  const [profile, setProfile] = useState(null);
+  const { userProfile, updateUserProfile, fetchUserProfile } = useUser(); // Use the context
+  
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -34,97 +36,93 @@ const TeacherProfile = ({ navigation }) => {
   const [gender, setGender] = useState("");
   const [address, setAddress] = useState("");
 
-  const loadProfile = useCallback(async () => {
+  // Load profile from context
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
     try {
       setLoading(true);
-      const res = await api.get("/teacher/profile");
-      const data = res.data.data;
-
-      console.log("Loaded profile data:", JSON.stringify(data, null, 2));
-
-      setProfile(data);
-
-      const personalInfo = data.personalInfo || {};
-
-      setFirstName(personalInfo.firstName || "");
-      setLastName(personalInfo.lastName || "");
-      setEmail(personalInfo.email || "");
-      setPhone(personalInfo.phone || "");
-      setDateOfBirth(personalInfo.dateOfBirth || "");
-      setGender(personalInfo.gender || "");
-      setAddress(personalInfo.address || "");
+      // Fetch profile through context
+      const profile = await fetchUserProfile();
+      
+      if (profile) {
+        const personalInfo = profile.personalInfo || {};
+        setFirstName(personalInfo.firstName || "");
+        setLastName(personalInfo.lastName || "");
+        setEmail(personalInfo.email || "");
+        setPhone(personalInfo.phone || "");
+        setDateOfBirth(personalInfo.dateOfBirth || "");
+        setGender(personalInfo.gender || "");
+        setAddress(personalInfo.address || "");
+      }
     } catch (e) {
       console.error("Load profile error:", e);
       Alert.alert("Error", "Failed to load profile");
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
-  useEffect(() => {
-    loadProfile();
-  }, [loadProfile]);
-
-const saveProfile = async () => {
-  try {
-    setSaving(true);
-    
-    // Prepare the update data
-    const updateData = {
-      personalInfo: {
-        firstName,
-        lastName,
-        email,
-        phone,
-        dateOfBirth,
-        gender,
-        address,
-      }
-    };
-
-    console.log("Saving profile data:", updateData);
-
-    const response = await api.patch("/teacher/profile", updateData);
-
-    if (response.data.success && response.data.data) {
-      setProfile(response.data.data);
-      setEditing(false);
+  const saveProfile = async () => {
+    try {
+      setSaving(true);
       
-      // Show a brief success message then navigate
-      Alert.alert(
-        "Success", 
-        "Profile updated successfully",
-        [
-          {
-            text: "OK",
-            onPress: () => {
-              // Navigate to Dashboard
-              navigation.navigate("TeacherDashboard");
+      // Prepare the update data
+      const updateData = {
+        personalInfo: {
+          firstName,
+          lastName,
+          email,
+          phone,
+          dateOfBirth,
+          gender,
+          address,
+        }
+      };
+
+      console.log("Saving profile data:", updateData);
+
+      // Use the context to update profile
+      const result = await updateUserProfile(updateData);
+
+      if (result.success) {
+        setEditing(false);
+        Alert.alert(
+          "Success", 
+          "Profile updated successfully",
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                // Navigate to Dashboard after user clicks OK
+                navigation.navigate("TeacherDashboard");
+              }
             }
-          }
-        ]
+          ]
+        );
+      } else {
+        throw new Error(result.message || "Update failed");
+      }
+    } catch (e) {
+      console.error("Save profile error:", e);
+      Alert.alert(
+        "Error",
+        e.response?.data?.message || e.message || "Update failed",
       );
-    } else {
-      throw new Error(response.data.message || "Update failed");
+    } finally {
+      setSaving(false);
     }
-  } catch (e) {
-    console.error("Save profile error:", e);
-    Alert.alert(
-      "Error",
-      e.response?.data?.message || e.message || "Update failed",
-    );
-  } finally {
-    setSaving(false);
-  }
-};
+  };
 
   const handleBackPress = () => {
-    navigation.goBack(); // This will go back to the previous screen (TeacherDashboard)
+    navigation.goBack();
   };
 
   const cancelEdit = () => {
-    // Reset form to original profile values
-    const personalInfo = profile?.personalInfo || {};
+    // Reset form to original profile values from context
+    const personalInfo = userProfile?.personalInfo || {};
     setFirstName(personalInfo.firstName || "");
     setLastName(personalInfo.lastName || "");
     setEmail(personalInfo.email || "");
@@ -148,7 +146,7 @@ const saveProfile = async () => {
       <StatusBar barStyle="light-content" backgroundColor="#7C3AED" />
 
       {/* Fixed Header with Back Button */}
-      <View style={[styles.header, { backgroundColor: "#7C3AED" }]}>
+      <View style={[styles.header, { backgroundColor: "#0D9488" }]}>
         <View style={styles.headerTop}>
           <TouchableOpacity
             onPress={handleBackPress}
@@ -247,7 +245,7 @@ const saveProfile = async () => {
             </View>
 
             <View style={styles.row}>
-              <View style={styles.dateFieldWidth}>
+              {/* <View style={styles.dateFieldWidth}>
                 <Field
                   label="Date of Birth"
                   value={dateOfBirth}
@@ -255,7 +253,7 @@ const saveProfile = async () => {
                   editing={editing}
                   placeholder="YYYY-MM-DD"
                 />
-              </View>
+              </View> */}
               <View style={styles.genderFieldWidth}>
                 <Field
                   label="Gender"
@@ -281,13 +279,13 @@ const saveProfile = async () => {
             <SectionTitle title="Teaching Info" />
             <ReadOnly
               label="Subjects"
-              value={profile?.teachingInfo?.subjects?.join(", ")}
+              value={userProfile?.teachingInfo?.subjects?.join(", ")}
             />
             <ReadOnly
               label="Classes"
-              value={profile?.teachingInfo?.classSections?.join(", ")}
+              value={userProfile?.teachingInfo?.classSections?.join(", ")}
             />
-            <ReadOnly label="Department" value={profile?.departmentId?.name} />
+            <ReadOnly label="Department" value={userProfile?.departmentId?.name} />
           </Card>
 
           {editing && (
@@ -362,7 +360,7 @@ const ReadOnly = ({ label, value }) => (
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#dfeee752",
   },
   loadingContainer: {
     flex: 1,
@@ -467,7 +465,7 @@ const styles = StyleSheet.create({
   },
   saveBtn: {
     marginTop: 10,
-    backgroundColor: "#7C3AED",
+    backgroundColor: "#33b033",
     height: 52,
     borderRadius: 14,
     justifyContent: "center",

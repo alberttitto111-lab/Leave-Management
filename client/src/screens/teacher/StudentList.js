@@ -183,7 +183,7 @@ const StudentList = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#e4e4e4",
+    backgroundColor: "#daefe552",
   },
   header: {
     paddingTop: Platform.OS === "ios" ? 50 : 30,

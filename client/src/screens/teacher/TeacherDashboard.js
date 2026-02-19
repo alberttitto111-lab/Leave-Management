@@ -1,5 +1,5 @@
 // screens/teacher/TeacherDashboard.js
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, act } from "react";
 import {
   View,
   Text,
@@ -13,9 +13,11 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { useAuth } from "../../contexts/AuthContext";
-import { useLeave } from "../../contexts/LeaveContext"; // Add this import
+import { useLeave } from "../../contexts/LeaveContext";
+import { useUser } from "../../contexts/UserContext"; // Add this import
+import { HoverEffect } from "react-native-gesture-handler";
 
-// StatCard component (unchanged)
+// StatCard component
 const StatCard = ({ icon, title, value, color }) => (
   <View style={[styles.statCard, { borderLeftColor: color }]}>
     <View style={[styles.iconContainer, { backgroundColor: color + "20" }]}>
@@ -28,7 +30,7 @@ const StatCard = ({ icon, title, value, color }) => (
   </View>
 );
 
-// LeaveCard component (unchanged)
+// LeaveCard component
 const LeaveCard = ({ leave, onPress }) => {
   const getStatusColor = (status) => {
     const colors = {
@@ -94,11 +96,11 @@ const LeaveCard = ({ leave, onPress }) => {
 
 const TeacherDashboard = ({ navigation }) => {
   const { logout } = useAuth();
+  const { userProfile, fetchUserProfile } = useUser(); // Use the user context
   const { 
     pendingLeaves, 
     approvedLeaves, 
-    stats, 
-    loading: leavesLoading, 
+    stats: leaveStats, 
     fetchAllLeaves,
     approveLeave,
     rejectLeave
@@ -112,17 +114,19 @@ const TeacherDashboard = ({ navigation }) => {
     subjects: [],
     isClassTeacher: false,
   });
-  const [profile, setProfile] = useState(null);
 
   const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       
-      // Fetch dashboard stats
+      // Fetch dashboard stats (for totalStudents, assignedClasses, etc.)
       const statsRes = await api.get("/teacher/dashboard-stats");
+      console.log("Stats response:", statsRes.data);
       
-      // Fetch profile
-      const profileRes = await api.get("/teacher/profile");
+      // Fetch user profile through context (if not already loaded)
+      if (!userProfile) {
+        await fetchUserProfile();
+      }
       
       // Fetch leaves data through context
       await fetchAllLeaves();
@@ -133,8 +137,6 @@ const TeacherDashboard = ({ navigation }) => {
         subjects: statsRes.data.data?.subjects || [],
         isClassTeacher: statsRes.data.data?.isClassTeacher || false,
       });
-      
-      setProfile(profileRes.data.data);
     } catch (error) {
       console.error("Dashboard load error:", error);
       Alert.alert("Error", "Failed to load dashboard data");
@@ -142,7 +144,7 @@ const TeacherDashboard = ({ navigation }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [fetchAllLeaves]);
+  }, [fetchAllLeaves, fetchUserProfile, userProfile]);
 
   useEffect(() => {
     loadDashboardData();
@@ -150,10 +152,11 @@ const TeacherDashboard = ({ navigation }) => {
     // Add focus listener to refresh data when tab is focused
     const unsubscribe = navigation.addListener('focus', () => {
       fetchAllLeaves();
+      fetchUserProfile(); // Refresh user profile when tab gains focus
     });
 
     return unsubscribe;
-  }, [navigation, fetchAllLeaves, loadDashboardData]);
+  }, [navigation, fetchAllLeaves, fetchUserProfile, loadDashboardData]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -240,7 +243,7 @@ const TeacherDashboard = ({ navigation }) => {
     }
   };
 
-  if (loading && !profile) {
+  if (loading && !userProfile) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0D9488" />
@@ -258,13 +261,13 @@ const TeacherDashboard = ({ navigation }) => {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      {/* Header */}
+      {/* Header - Using userProfile from context */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <View style={styles.headerTextContainer}>
             <Text style={styles.greeting}>Welcome back,</Text>
             <Text style={styles.teacherName}>
-              {profile?.personalInfo?.firstName} {profile?.personalInfo?.lastName}
+              {userProfile?.personalInfo?.firstName} {userProfile?.personalInfo?.lastName}
             </Text>
             <View style={styles.badgeContainer}>
               {dashboardStats.isClassTeacher && (
@@ -294,24 +297,24 @@ const TeacherDashboard = ({ navigation }) => {
           icon="people"
           title="My Students"
           value={dashboardStats.totalStudents}
-          color="#0D9488"
+          color="#19cf80"
         />
         <StatCard
           icon="time"
           title="Pending"
-          value={stats.pending}
+          value={leaveStats.pending}
           color="#F59E0B"
         />
         <StatCard
           icon="checkmark-circle"
           title="Approved"
-          value={stats.approved}
-          color="#3B82F6"
+          value={leaveStats.approved}
+          color="#208cff"
         />
         <StatCard
           icon="close-circle"
           title="Rejected"
-          value={stats.rejected}
+          value={leaveStats.rejected}
           color="#EF4444"
         />
       </View>
@@ -342,7 +345,7 @@ const TeacherDashboard = ({ navigation }) => {
             style={styles.actionCard}
             onPress={navigateToStudents}
           >
-            <View style={[styles.actionIcon, { backgroundColor: '#0D9488' }]}>
+            <View style={[styles.actionIcon, { backgroundColor: '#1aba75' }]}>
               <Ionicons name="people" size={24} color="#fff" />
             </View>
             <Text style={styles.actionText}>My Students</Text>
@@ -351,7 +354,7 @@ const TeacherDashboard = ({ navigation }) => {
             style={styles.actionCard}
             onPress={navigateToLeaveRequests}
           >
-            <View style={[styles.actionIcon, { backgroundColor: '#F59E0B' }]}>
+            <View style={[styles.actionIcon, { backgroundColor: '#f0a21d' }]}>
               <Ionicons name="time" size={24} color="#fff" />
             </View>
             <Text style={styles.actionText}>Leave Requests</Text>
@@ -360,7 +363,7 @@ const TeacherDashboard = ({ navigation }) => {
             style={styles.actionCard}
             onPress={navigateToProfile}
           >
-            <View style={[styles.actionIcon, { backgroundColor: '#3B82F6' }]}>
+            <View style={[styles.actionIcon, { backgroundColor: '#327cf4' }]}>
               <Ionicons name="person" size={24} color="#fff" />
             </View>
             <Text style={styles.actionText}>My Profile</Text>
@@ -406,7 +409,7 @@ const TeacherDashboard = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#f4f4f4",
   },
   loadingContainer: {
     flex: 1,
@@ -537,6 +540,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     marginRight: 10,
+    marginTop: 8,
     borderWidth: 1,
     borderColor: "#0D9488",
   },
@@ -561,7 +565,9 @@ const styles = StyleSheet.create({
   },
   horizontalLeaveCard: {
     width: 260,
-    backgroundColor: "#fff",
+    backgroundColor: "#fbfbfb",
+    borderWidth: 1,
+    borderColor: "#87cec8",
     borderRadius: 16,
     padding: 16,
     marginRight: 12,
@@ -580,17 +586,17 @@ const styles = StyleSheet.create({
   horizontalAvatar: {
     width: 48,
     height: 48,
-    borderRadius: 24,
-    backgroundColor: "#E6FFFA",
+    borderRadius: 10,
+    backgroundColor: "#e8f7f3a7",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#0D9488",
+    borderColor: "#57cfc5",
   },
   horizontalAvatarText: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#0D9488",
+    color: "#16a095",
   },
   horizontalCardDetails: {
     flex: 1,
@@ -638,14 +644,14 @@ const styles = StyleSheet.create({
   },
   actionCard: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#fbfffe",
     borderRadius: 16,
     padding: 16,
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: "#115f44",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
     elevation: 2,
   },
   actionIcon: {

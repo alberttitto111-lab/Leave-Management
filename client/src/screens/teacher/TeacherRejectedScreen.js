@@ -184,7 +184,7 @@ const TeacherRejectedScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#e7f3ed52",
   },
   center: {
     flex: 1,

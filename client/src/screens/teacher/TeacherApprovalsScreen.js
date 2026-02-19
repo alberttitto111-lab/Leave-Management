@@ -173,7 +173,7 @@ const TeacherApprovalsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#daefe552",
   },
   center: {
     flex: 1,
