@@ -6,14 +6,12 @@ const studentAcademicSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      unique: true, // One academic record per student
+      unique: true,
     },
-
     academicInfo: {
       rollNumber: {
         type: String,
         required: true,
-        // ❌ REMOVE: unique: true (we'll use compound index instead)
       },
       class: {
         type: String,
@@ -34,12 +32,10 @@ const studentAcademicSchema = new mongoose.Schema(
         parentEmail: String,
       },
     },
-
     classTeacherId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
-
     hodId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -47,18 +43,17 @@ const studentAcademicSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  },
+  }
 );
 
-// ✅ COMPOUND UNIQUE INDEX: Same roll number allowed in different classes/sections
-// But NOT allowed in same class-section combination
+// Compound unique index: Same roll number allowed in different classes/sections
 studentAcademicSchema.index(
   {
     "academicInfo.class": 1,
     "academicInfo.section": 1,
     "academicInfo.rollNumber": 1,
   },
-  { unique: true },
+  { unique: true }
 );
 
 export default mongoose.model("StudentAcademic", studentAcademicSchema);

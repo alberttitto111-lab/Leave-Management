@@ -21,6 +21,8 @@ import { COLORS } from "../../utils/constants";
 
 const HEADER_HEIGHT = 120;
 
+/* ----------------------------- CARD ----------------------------- */
+
 const StudentCard = ({ student, onPress }) => {
   const p = student.personalInfo || {};
   const a = student.academicInfo || {};
@@ -41,7 +43,9 @@ const StudentCard = ({ student, onPress }) => {
         <Text style={styles.details}>
           {a.class || ""}{a.section ? `-${a.section}` : ""} • Roll: {a.rollNumber || "N/A"}
         </Text>
-        <Text style={styles.id}>{student.userId}</Text>
+        <View style={styles.idContainer}>
+          <Text style={styles.id}>{student.userId}</Text>
+        </View>
         {department.name && (
           <Text style={styles.department}>{department.name}</Text>
         )}
@@ -50,6 +54,8 @@ const StudentCard = ({ student, onPress }) => {
     </TouchableOpacity>
   );
 };
+
+/* ----------------------------- MAIN ----------------------------- */
 
 const DepartmentStudents = ({ navigation }) => {
   const [students, setStudents] = useState([]);
@@ -66,14 +72,41 @@ const DepartmentStudents = ({ navigation }) => {
     filterStudents();
   }, [searchQuery, students]);
 
+  /* ----------------------------- LOAD ----------------------------- */
+
   const loadStudents = async () => {
     try {
       const response = await api.get("/hod/students");
       console.log("Students API response:", response.data);
-      
+
       // Accept multiple backend shapes safely
-      const list = response?.data?.data || response?.data || [];
-      setStudents(Array.isArray(list) ? list : []);
+      const list =
+        response?.data?.data ||
+        response?.data?.students ||
+        response?.data ||
+        [];
+
+      const studentsList = Array.isArray(list) ? list : [];
+      
+      // Sort students by roll number (numeric value)
+      const sortedStudents = studentsList.sort((a, b) => {
+        const rollA = a.academicInfo?.rollNumber || "";
+        const rollB = b.academicInfo?.rollNumber || "";
+        
+        // Extract numeric part from roll number if it contains non-numeric characters
+        const numA = parseInt(rollA.toString().replace(/\D/g, '')) || 0;
+        const numB = parseInt(rollB.toString().replace(/\D/g, '')) || 0;
+        
+        // Compare by numeric value first
+        if (numA !== numB) {
+          return numA - numB;
+        }
+        
+        // If numeric values are equal or no numbers, sort alphabetically
+        return rollA.toString().localeCompare(rollB.toString());
+      });
+
+      setStudents(sortedStudents);
     } catch (error) {
       console.error("Load students error:", error);
       Alert.alert("Error", "Failed to load students");
@@ -83,6 +116,8 @@ const DepartmentStudents = ({ navigation }) => {
       setRefreshing(false);
     }
   };
+
+  /* ----------------------------- FILTER ----------------------------- */
 
   const filterStudents = () => {
     if (!searchQuery) {
@@ -98,13 +133,29 @@ const DepartmentStudents = ({ navigation }) => {
         s?.userId?.toLowerCase?.().includes(query) ||
         personalInfo?.firstName?.toLowerCase?.().includes(query) ||
         personalInfo?.lastName?.toLowerCase?.().includes(query) ||
-        academicInfo?.rollNumber?.toString?.().includes(query) ||
+        academicInfo?.rollNumber?.toString?.().toLowerCase().includes(query) ||
         academicInfo?.class?.toLowerCase?.().includes(query)
       );
     });
 
-    setFilteredStudents(filtered);
+    // Keep filtered students sorted by roll number
+    const sortedFiltered = filtered.sort((a, b) => {
+      const rollA = a.academicInfo?.rollNumber || "";
+      const rollB = b.academicInfo?.rollNumber || "";
+      
+      const numA = parseInt(rollA.toString().replace(/\D/g, '')) || 0;
+      const numB = parseInt(rollB.toString().replace(/\D/g, '')) || 0;
+      
+      if (numA !== numB) {
+        return numA - numB;
+      }
+      return rollA.toString().localeCompare(rollB.toString());
+    });
+
+    setFilteredStudents(sortedFiltered);
   };
+
+  /* ----------------------------- HANDLERS ----------------------------- */
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -112,20 +163,22 @@ const DepartmentStudents = ({ navigation }) => {
   };
 
   const handleStudentPress = (student) => {
-    // Navigate to student details
-    navigation.navigate("StudentDetail", { studentId: student._id });
+    // Navigate to HOD student details
+    navigation.navigate("HodStudentDetail", { studentId: student._id });
   };
 
   const handleBackPress = () => {
     navigation.goBack();
   };
 
+  /* ----------------------------- UI ----------------------------- */
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.hod || "#6366F1"} />
+      <StatusBar barStyle="light-content" backgroundColor="#d72c2c" />
       
       {/* Fixed Header with Back Button */}
-      <View style={[styles.header, { backgroundColor: "#d72c2c"  }]}>
+      <View style={[styles.header, { backgroundColor: "#d72c2c" }]}>
         <View style={styles.headerTop}>
           <TouchableOpacity
             onPress={handleBackPress}
@@ -178,8 +231,8 @@ const DepartmentStudents = ({ navigation }) => {
             <RefreshControl 
               refreshing={refreshing} 
               onRefresh={onRefresh}
-              colors={[COLORS.hod || "#6366F1"]}
-              tintColor={COLORS.hod || "#6366F1"}
+              colors={["#d72c2c"]}
+              tintColor="#d72c2c"
             />
           }
         >
@@ -188,7 +241,7 @@ const DepartmentStudents = ({ navigation }) => {
 
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={COLORS.hod || "#6366F1"} />
+              <ActivityIndicator size="large" color="#d72c2c" />
               <Text style={styles.loadingText}>Loading students...</Text>
             </View>
           ) : filteredStudents.length === 0 ? (
@@ -218,6 +271,8 @@ const DepartmentStudents = ({ navigation }) => {
     </View>
   );
 };
+
+/* ----------------------------- STYLES ----------------------------- */
 
 const styles = StyleSheet.create({
   container: {
@@ -331,7 +386,7 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 18,
     fontWeight: "bold",
-    color: COLORS.hod || "#6366F1",
+    color: "#d72c2c",
   },
   info: {
     flex: 1,
@@ -346,14 +401,22 @@ const styles = StyleSheet.create({
     color: "#64748B",
     marginTop: 2,
   },
+  idContainer: {
+    alignSelf: "flex-start",
+    marginTop: 2,
+  },
   id: {
     fontSize: 12,
-    color: "#94A3B8",
-    marginTop: 2,
+    color: "#444546",
+    backgroundColor: "#d72c2c20",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    overflow: "hidden",
   },
   department: {
     fontSize: 11,
-    color: COLORS.hod || "#6366F1",
+    color: "#d72c2c",
     marginTop: 2,
     fontWeight: "500",
   },
@@ -371,7 +434,7 @@ const styles = StyleSheet.create({
   clearSearchText: {
     marginTop: 10,
     fontSize: 14,
-    color: COLORS.hod || "#6366F1",
+    color: "#d72c2c",
     fontWeight: "600",
   },
 });

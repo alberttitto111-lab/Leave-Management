@@ -10,6 +10,7 @@ import { COLORS } from "./utils/constants";
 import { ToastProvider } from "./contexts/ToastContext";
 import { LeaveProvider } from "./contexts/LeaveContext"; // New import
 import { UserProvider } from "./contexts/UserContext"; // New import
+import { HodProvider } from "./contexts/HodContext"; // New import
 
 const App = () => {
   const [fontsLoaded, setFontsLoaded] = useState(false);
@@ -28,9 +29,11 @@ const App = () => {
       <ToastProvider>
         <AuthProvider>
           <UserProvider>
-            <LeaveProvider> 
-              <RootNavigator />
-            </LeaveProvider>
+            <HodProvider>
+              <LeaveProvider> 
+                <RootNavigator />
+              </LeaveProvider>
+            </HodProvider>
           </UserProvider>
         </AuthProvider>
       </ToastProvider>

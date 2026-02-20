@@ -1,5 +1,5 @@
 // screens/HOD/HodProfile.js
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,16 +14,14 @@ import {
   KeyboardAvoidingView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import api from "../../services/api";
-import { getAccessToken } from "../../utils/storage";
-import { API_BASE_URL } from "../../utils/constants";
-import { COLORS } from "../../utils/constants";
+import { useHod } from "../../contexts/HodContext"; // Add this import
 
 const HEADER_HEIGHT = 100;
 
 const HodProfile = ({ navigation }) => {
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { hodProfile, updateHodProfile, loading: contextLoading } = useHod();
+  
+  const [localLoading, setLocalLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
 
@@ -41,18 +39,11 @@ const HodProfile = ({ navigation }) => {
   const [managedDepartments, setManagedDepartments] = useState([]);
   const [departmentName, setDepartmentName] = useState("");
 
-  const loadProfile = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await api.get("/hod/profile");
-      const data = res.data.data;
-
-      console.log("Loaded HOD profile data:", JSON.stringify(data, null, 2));
-
-      setProfile(data);
-
-      const personalInfo = data.personalInfo || {};
-      const hodInfo = data.hodInfo || {};
+  // Load profile data when component mounts or hodProfile changes
+  useEffect(() => {
+    if (hodProfile) {
+      const personalInfo = hodProfile.personalInfo || {};
+      const hodInfo = hodProfile.hodInfo || {};
 
       setFirstName(personalInfo.firstName || "");
       setLastName(personalInfo.lastName || "");
@@ -67,25 +58,22 @@ const HodProfile = ({ navigation }) => {
       // Get managed departments
       if (hodInfo.managedDepartments && hodInfo.managedDepartments.length > 0) {
         setManagedDepartments(hodInfo.managedDepartments);
-        // Set the first department name for display
         if (hodInfo.managedDepartments[0]?.name) {
           setDepartmentName(hodInfo.managedDepartments[0].name);
         }
-      } else if (data.departmentId?.name) {
-        setDepartmentName(data.departmentId.name);
-        setManagedDepartments([data.departmentId]);
+      } else if (hodProfile.departmentId?.name) {
+        setDepartmentName(hodProfile.departmentId.name);
+        setManagedDepartments([hodProfile.departmentId]);
       }
-    } catch (e) {
-      console.error("Load profile error:", e);
-      Alert.alert("Error", "Failed to load profile");
-    } finally {
-      setLoading(false);
+      
+      setLocalLoading(false);
+    } else {
+      // If no profile in context yet, set loading to false after a timeout
+      // The context will eventually load the profile
+      const timer = setTimeout(() => setLocalLoading(false), 1000);
+      return () => clearTimeout(timer);
     }
-  }, []);
-
-  useEffect(() => {
-    loadProfile();
-  }, [loadProfile]);
+  }, [hodProfile]);
 
   const saveProfile = async () => {
     try {
@@ -109,10 +97,9 @@ const HodProfile = ({ navigation }) => {
 
       console.log("Saving HOD profile data:", updateData);
 
-      const response = await api.patch("/hod/profile", updateData);
+      const result = await updateHodProfile(updateData);
 
-      if (response.data.success && response.data.data) {
-        setProfile(response.data.data);
+      if (result.success) {
         setEditing(false);
         Alert.alert(
           "Success", 
@@ -128,13 +115,13 @@ const HodProfile = ({ navigation }) => {
           ]
         );
       } else {
-        throw new Error(response.data.message || "Update failed");
+        throw new Error(result.message || "Update failed");
       }
     } catch (e) {
       console.error("Save profile error:", e);
       Alert.alert(
         "Error",
-        e.response?.data?.message || e.message || "Update failed",
+        e.message || "Update failed",
       );
     } finally {
       setSaving(false);
@@ -147,8 +134,8 @@ const HodProfile = ({ navigation }) => {
 
   const cancelEdit = () => {
     // Reset form to original profile values
-    const personalInfo = profile?.personalInfo || {};
-    const hodInfo = profile?.hodInfo || {};
+    const personalInfo = hodProfile?.personalInfo || {};
+    const hodInfo = hodProfile?.hodInfo || {};
     
     setFirstName(personalInfo.firstName || "");
     setLastName(personalInfo.lastName || "");
@@ -163,7 +150,7 @@ const HodProfile = ({ navigation }) => {
     setEditing(false);
   };
 
-  if (loading) {
+  if (localLoading || (contextLoading && !hodProfile)) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#d13030" />
@@ -305,15 +292,6 @@ const HodProfile = ({ navigation }) => {
             </View>
 
             <View style={styles.row}>
-              {/* <View style={styles.dateFieldWidth}>
-                <Field
-                  label="Date of Birth"
-                  value={dateOfBirth}
-                  onChangeText={setDateOfBirth}
-                  editing={editing}
-                  placeholder="YYYY-MM-DD"
-                />
-              </View> */}
               <View style={styles.genderFieldWidth}>
                 <Field
                   label="Gender"
@@ -406,7 +384,7 @@ const ReadOnly = ({ label, value }) => (
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#eee2e2",
   },
   loadingContainer: {
     flex: 1,

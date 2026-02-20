@@ -27,6 +27,8 @@ import DepartmentTeachers from "../screens/HOD/DepartmentTeachers";
 import DepartmentStudents from "../screens/HOD/DepartmentStudents";
 import HodProfile from "../screens/HOD/HodProfile";
 
+import HodStudentDetail from "../screens/HOD/HodStudentDetail";
+
 // Teacher Screens
 import TeacherDashboard from "../screens/teacher/TeacherDashboard";
 import TeacherProfile from "../screens/teacher/TeacherProfile";
@@ -498,10 +500,10 @@ const AppNavigator = () => {
                 options={{ headerShown: false }}
               />
               <Stack.Screen
-                name="StudentDetail"
-                component={StudentDetail}
-                options={{ headerShown: true }}
-              />
+      name="HodStudentDetail"
+      component={HodStudentDetail}
+      options={{ headerShown: false }}
+    />
             </>
           )}
 

@@ -3,6 +3,7 @@ import { getHodAnalytics } from "../controllers/hodController.js";
 import { protect } from "../middleware/auth.js";
 import LeaveRequest from "../models/LeaveRequest.js";
 import User from "../models/User.js";
+import StudentAcademic from "../models/StudentAcademic.js"; // Add this import
 import {
   generateApprovalLetter,
   generateRejectionLetter,
@@ -35,14 +36,10 @@ router.get("/pending-leaves", protect, onlyHod, async (req, res) => {
       finalStatus: "pending",
       currentLevel: 2,
     })
-      // .populate("applicantId")
-      // .populate("leaveType")
-      // .populate("departmentId")
-      // .sort({ createdAt: -1 });
        .populate({
       path: "applicantId",
       populate: {
-        path: "departmentId",  // This populates the department from the User model
+        path: "departmentId",
         model: "Department"
       }
     })
@@ -93,28 +90,15 @@ router.post("/action/:id", protect, onlyHod, async (req, res) => {
 
     // Status update - Use valid enum values from schema
     if (action === "approve") {
-      leave.status = "approved_by_hod"; // This is valid
+      leave.status = "approved_by_hod";
       leave.finalStatus = "approved";
       leave.currentLevel = 3;
-
-      // Generate approval letter if needed
-      // const letter = await generateApprovalLetter(leave, approver);
-      // leave.approvalLetter = letter.url;
     }
 
     if (action === "reject") {
-      // FIXED: Use "rejected" instead of "rejected_by_hod"
-      leave.status = "rejected"; // This is valid
+      leave.status = "rejected";
       leave.finalStatus = "rejected";
       leave.currentLevel = 0;
-
-      // Generate rejection letter if needed
-      // const letter = await generateRejectionLetter(
-      //   leave,
-      //   approver,
-      //   rejectionReason || remark || "Not specified",
-      // );
-      // leave.rejectionLetter = letter.url;
     }
 
     // Add to approval history
@@ -209,21 +193,61 @@ router.get("/teachers", protect, onlyHod, async (req, res) => {
   }
 });
 
-/* ---------------- HOD STUDENTS ---------------- */
+/* ================= UPDATED HOD STUDENTS ENDPOINT ================= */
 
 router.get("/students", protect, onlyHod, async (req, res) => {
   try {
+    // First, get the HOD's department
+    const hod = await User.findById(req.user._id).populate("hodInfo.managedDepartments");
+    
+    let departmentIds = [];
+    
+    // Get department IDs that this HOD manages
+    if (hod.hodInfo?.managedDepartments?.length > 0) {
+      departmentIds = hod.hodInfo.managedDepartments.map(d => d._id);
+    } else if (hod.departmentId) {
+      departmentIds = [hod.departmentId];
+    }
+    
+    if (departmentIds.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+      });
+    }
+
+    // Get all students in these departments
     const students = await User.find({
       role: "student",
+      departmentId: { $in: departmentIds },
       isActive: true,
     })
       .select("-password")
-      .populate("departmentId", "name")
+      .populate("departmentId", "name code")
       .sort({ createdAt: -1 });
+
+    // Get academic info for each student
+    const studentIds = students.map(s => s._id);
+    const academics = await StudentAcademic.find({
+      userId: { $in: studentIds },
+    }).lean();
+
+    // Create a map of academic info by userId
+    const academicMap = new Map();
+    academics.forEach((a) => {
+      academicMap.set(String(a.userId), a.academicInfo);
+    });
+
+    // Merge academic info with student data
+    const studentsWithAcademic = students.map((student) => ({
+      ...student.toObject(),
+      academicInfo: academicMap.get(String(student._id)) || {},
+    }));
 
     res.json({
       success: true,
-      data: students,
+      count: studentsWithAcademic.length,
+      data: studentsWithAcademic,
     });
   } catch (err) {
     console.error("HOD students error:", err);
@@ -362,7 +386,7 @@ router.patch("/profile", protect, onlyHod, async (req, res) => {
   }
 });
 
-// Get department info for HOD
+// Get department info for HOD (alternative endpoint)
 router.get("/department-info", protect, onlyHod, async (req, res) => {
   try {
     const hod = await User.findById(req.user._id)
@@ -393,6 +417,43 @@ router.get("/department-info", protect, onlyHod, async (req, res) => {
   }
 });
 
+/* ---------------- HOD STUDENT DETAILS ---------------- */
 
+router.get("/students/:id", protect, onlyHod, async (req, res) => {
+  try {
+    const student = await User.findOne({
+      _id: req.params.id,
+      role: "student",
+    })
+      .select("-password")
+      .populate("departmentId", "name code");
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found",
+      });
+    }
+
+    // Get academic info
+    const academic = await StudentAcademic.findOne({
+      userId: student._id,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        ...student.toObject(),
+        academicInfo: academic?.academicInfo || null,
+      },
+    });
+  } catch (err) {
+    console.error("HOD student details error:", err);
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
 
 export default router;

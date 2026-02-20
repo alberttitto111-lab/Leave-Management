@@ -1,4 +1,4 @@
-// screens/HOD/HodStudentDetail.js
+// screens/HOD/HODStudentDetail.js
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -39,7 +39,7 @@ const HodStudentDetail = ({ route, navigation }) => {
     try {
       setLoading(true);
       const res = await api.get(`/hod/students/${studentId}`);
-      console.log("Student data with department:", JSON.stringify(res.data.data.departmentId, null, 2));
+      console.log("HOD Student data:", JSON.stringify(res.data.data, null, 2));
       setStudent(res.data.data);
     } catch (err) {
       console.error("Failed to load student:", err);
@@ -66,7 +66,7 @@ const HodStudentDetail = ({ route, navigation }) => {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.hod || "#d13030"} />
+        <ActivityIndicator size="large" color="#d13030" />
         <Text style={{ marginTop: 10 }}>Loading student details...</Text>
       </View>
     );
@@ -84,7 +84,7 @@ const HodStudentDetail = ({ route, navigation }) => {
   const p = student.personalInfo || {};
   const a = student.academicInfo || {};
   
-  // Safe access to department data - could be object or ID
+  // Safe access to department data
   const department = student.departmentId || {};
   const departmentName = typeof department === 'object' ? department.name : null;
   const departmentCode = typeof department === 'object' ? department.code : null;
@@ -107,10 +107,10 @@ const HodStudentDetail = ({ route, navigation }) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.hod || "#d13030"} />
+      <StatusBar barStyle="light-content" backgroundColor="#d13030" />
 
       {/* Fixed Header with Back Button */}
-      <View style={[styles.header, { backgroundColor: COLORS.hod || "#d13030" }]}>
+      <View style={[styles.header, { backgroundColor: "#d13030" }]}>
         <View style={styles.headerTop}>
           <TouchableOpacity
             onPress={handleBackPress}
@@ -139,8 +139,8 @@ const HodStudentDetail = ({ route, navigation }) => {
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={onRefresh}
-            colors={[COLORS.hod || "#d13030"]}
-            tintColor={COLORS.hod || "#d13030"}
+            colors={["#d13030"]}
+            tintColor="#d13030"
           />
         }
       >
@@ -172,7 +172,7 @@ const HodStudentDetail = ({ route, navigation }) => {
           <InfoRow label="Batch Year" value={a.batchYear?.toString()} />
         </View>
 
-        {/* Department */}
+        {/* Department Information */}
         <View style={styles.formCard}>
           <SectionHeader title="Department" />
           <InfoRow label="Department Name" value={departmentName || "Not Assigned"} />
@@ -193,8 +193,8 @@ const HodStudentDetail = ({ route, navigation }) => {
           <InfoRow label="Address" value={p.address} />
         </View>
 
-        {/* Parent/Guardian Information - if available */}
-        {a.parentDetails && (
+        {/* Parent/Guardian Information (if available) */}
+        {/* {a.parentDetails && (
           <View style={styles.formCard}>
             <SectionHeader title="Parent / Guardian Information" />
             {a.parentDetails.fatherName && (
@@ -210,20 +210,9 @@ const HodStudentDetail = ({ route, navigation }) => {
               <InfoRow label="Parent Email" value={a.parentDetails.parentEmail} />
             )}
           </View>
-        )}
+        )} */}
 
-        {/* Leave Statistics - Optional additional section for HOD */}
-        {student.leaveStats && (
-          <View style={styles.formCard}>
-            <SectionHeader title="Leave Statistics" />
-            <InfoRow label="Total Leaves" value={student.leaveStats.total?.toString()} />
-            <InfoRow label="Approved" value={student.leaveStats.approved?.toString()} />
-            <InfoRow label="Pending" value={student.leaveStats.pending?.toString()} />
-            <InfoRow label="Rejected" value={student.leaveStats.rejected?.toString()} />
-          </View>
-        )}
-
-        {/* Bottom padding for comfortable scrolling */}
+        {/* Bottom padding */}
         <View style={{ height: 40 }} />
       </ScrollView>
     </View>
@@ -241,7 +230,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: COLORS.background,
   },
-  // Header styles
   header: {
     position: "absolute",
     top: 0,
@@ -283,13 +271,11 @@ const styles = StyleSheet.create({
     opacity: 0.8,
     marginTop: 2,
   },
-  // Scroll content
   scrollContent: {
     paddingHorizontal: 20,
     paddingBottom: 20,
     flexGrow: 1,
   },
-  // Form Card
   formCard: {
     backgroundColor: COLORS.white,
     borderRadius: 24,
@@ -305,10 +291,9 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontSize: 18,
     fontWeight: "700",
-    color: COLORS.hod || "#d13030",
+    color: "#d13030",
     marginBottom: 15,
   },
-  // Info Row styling
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",

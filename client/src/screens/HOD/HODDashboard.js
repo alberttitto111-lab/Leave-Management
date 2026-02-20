@@ -1,5 +1,5 @@
 // screens/HOD/HodDashboard.js
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
@@ -11,106 +11,110 @@ import {
   RefreshControl,
 } from "react-native";
 import { useAuth } from "../../contexts/AuthContext";
+import { useHod } from "../../contexts/HodContext";
 import { COLORS } from "../../utils/constants";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import api from "../../services/api";
 
 const { width } = Dimensions.get("window");
 
 const HodDashboard = ({ navigation }) => {
   const { user, logout } = useAuth();
-
-  const [stats, setStats] = useState({
-    totalTeachers: 0,
-    totalStudents: 0,
-    pendingHodApprovals: 0,
-    approvedByHod: 0,
-  });
-
-  const [recentActivity, setRecentActivity] = useState([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [departmentName, setDepartmentName] = useState("");
-
-  const fetchDashboardData = async () => {
-    try {
-      const res = await api.get("/hod/analytics");
-      const data = res.data.data || {};
-
-      setStats(data.stats || {});
-      setRecentActivity(data.recentActivity || []);
-    } catch (err) {
-      console.error("HOD dashboard error:", err);
-    }
-  };
-
-  const fetchDepartmentInfo = async () => {
-    try {
-      // Fetch HOD's department info
-      const res = await api.get("/hod/department-info");
-      if (res.data.success) {
-        setDepartmentName(res.data.data.departmentName || "");
-      }
-    } catch (err) {
-      console.error("Failed to fetch department info:", err);
-      
-      // Fallback: Try to get department from user object
-      if (user?.departmentId?.name) {
-        setDepartmentName(user.departmentId.name);
-      } else if (user?.departmentId) {
-        // If we have department ID but not name, fetch it separately
-        try {
-          const deptRes = await api.get(`/admin/departments/${user.departmentId}`);
-          setDepartmentName(deptRes.data.name);
-        } catch (deptErr) {
-          console.error("Failed to fetch department details:", deptErr);
-        }
-      }
-    }
-  };
+  const { 
+    stats, 
+    recentActivity, 
+    departmentName, 
+    hodProfile,
+    refreshAllData,
+    loading 
+  } = useHod();
 
   useEffect(() => {
-    fetchDashboardData();
-    fetchDepartmentInfo();
-  }, []);
+    refreshAllData();
+    
+    // Add focus listener to refresh data when tab is focused
+    const unsubscribe = navigation.addListener('focus', () => {
+      refreshAllData();
+    });
+
+    return unsubscribe;
+  }, [navigation, refreshAllData]);
 
   const onRefresh = async () => {
-    setRefreshing(true);
-    await Promise.all([fetchDashboardData(), fetchDepartmentInfo()]);
-    setRefreshing(false);
+    await refreshAllData();
   };
 
   const quickActions = [
     {
-      title: "Leave Requests",
+      title: "Leave Approvals",
       icon: "file-check",
       screen: "HodLeaveApprovals",
-      color: "#f5880b",
+      color: COLORS.warning,
     },
     {
       title: "Teachers",
       icon: "account-tie",
       screen: "DepartmentTeachers",
-      color: "#1f79f7",
+      color: COLORS.primary,
     },
     {
       title: "Students",
       icon: "school",
       screen: "DepartmentStudents",
-      color: "#cd20b6",
+      color: COLORS.info,
     },
     {
-      title: "My Profile", // Changed from "Department" to "HOD Profile"
-      icon: "account-circle", // Changed icon to profile icon
-      screen: "HodProfile", // Updated screen name
-      color: "#0cb706", // Using header color for consistency
+      title: "HOD Profile",
+      icon: "account-circle",
+      screen: "HodProfile",
+      color: "#d13030",
     },
   ];
+
+  // Get full name from context or user object
+  const getFullName = () => {
+    // Try to get from hodProfile first (most up-to-date)
+    if (hodProfile?.personalInfo) {
+      const { firstName, lastName } = hodProfile.personalInfo;
+      if (firstName || lastName) {
+        return `${firstName || ""} ${lastName || ""}`.trim();
+      }
+    }
+    
+    // Fallback to user object from auth context
+    if (user?.personalInfo) {
+      const { firstName, lastName } = user.personalInfo;
+      if (firstName || lastName) {
+        return `${firstName || ""} ${lastName || ""}`.trim();
+      }
+    }
+    
+    // Final fallback
+    return "HOD";
+  };
+
+  // Get first name for greeting
+  const getFirstName = () => {
+    // Try to get from hodProfile first
+    if (hodProfile?.personalInfo?.firstName) {
+      return hodProfile.personalInfo.firstName;
+    }
+    
+    // Fallback to user object
+    if (user?.personalInfo?.firstName) {
+      return user.personalInfo.firstName;
+    }
+    
+    return "HOD";
+  };
+
+  const fullName = getFullName();
+  const firstName = getFirstName();
 
   return (
     <View style={styles.container}>
       <StatusBar
         barStyle="light-content"
-        backgroundColor="#d13030" // Matching header color
+        backgroundColor="#d13030"
       />
 
       {/* Header */}
@@ -119,10 +123,10 @@ const HodDashboard = ({ navigation }) => {
           <View>
             <Text style={styles.greeting}>Welcome back,</Text>
             <Text style={styles.userName}>
-              {user?.personalInfo?.firstName || "HOD"}
+              {fullName}
             </Text>
             
-            {/* Department Badge */}
+            {/* Department Badge - Now updates in real-time */}
             {departmentName ? (
               <View style={styles.departmentBadge}>
                 <Icon name="star" size={14} color="#ffdd00" />
@@ -141,34 +145,39 @@ const HodDashboard = ({ navigation }) => {
         style={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl 
+            refreshing={loading} 
+            onRefresh={onRefresh}
+            colors={["#d13030"]}
+            tintColor="#d13030"
+          />
         }
       >
         {/* Stats */}
         <View style={styles.statsContainer}>
           <StatCard
-            color= "#1f7ff4"
+            color={COLORS.primary}
             icon="account-tie"
             value={stats.totalTeachers}
             title="Teachers"
           />
 
           <StatCard
-            color= "#c61ff4"
+            color={COLORS.info}
             icon="school"
             value={stats.totalStudents}
             title="Students"
           />
 
           <StatCard
-            color= "#f4911f"
+            color={COLORS.warning}
             icon="clock-alert"
             value={stats.pendingHodApprovals}
             title="Pending Approvals"
           />
 
           <StatCard
-            color= "#17cf1d"
+            color={COLORS.success}
             icon="check-circle"
             value={stats.approvedByHod}
             title="Approved"
@@ -283,7 +292,6 @@ const styles = StyleSheet.create({
     color: "#fff",
     marginBottom: 8,
   },
-  // Department Badge styles
   departmentBadge: {
     flexDirection: "row",
     alignItems: "center",
