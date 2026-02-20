@@ -598,4 +598,34 @@ router.patch("/profile", protect, authorize("student"), async (req, res) => {
   }
 });
 
+// In server/routes/student.js
+router.get("/leave/:id", protect, authorize("student"), async (req, res) => {
+  try {
+    const leave = await LeaveRequest.findOne({
+      _id: req.params.id,
+      applicantId: req.user.id
+    })
+      .populate("leaveType")
+      .populate("approvals.approverId", "personalInfo.firstName personalInfo.lastName role");
+
+    if (!leave) {
+      return res.status(404).json({
+        success: false,
+        message: "Leave request not found"
+      });
+    }
+
+    res.json({
+      success: true,
+      data: leave
+    });
+  } catch (error) {
+    console.error("Error fetching leave:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch leave details"
+    });
+  }
+});
+
 export default router;

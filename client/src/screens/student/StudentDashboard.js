@@ -25,7 +25,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 
 const { width } = Dimensions.get("window");
 
-const StudentDashboard = ({ navigation, route }) => { // Add route to props
+const StudentDashboard = ({ navigation, route }) => {
   const { user, logout, token, refreshUserProfile } = useAuth();
   const [stats, setStats] = useState({
     pendingLeaves: 0,
@@ -54,10 +54,8 @@ const StudentDashboard = ({ navigation, route }) => { // Add route to props
 
   // Handle navigation params to open modal
   useEffect(() => {
-    // Check if we should open the leave modal from navigation params
     if (route.params?.openLeaveModal) {
       setModalVisible(true);
-      // Clear the param after opening
       navigation.setParams({ openLeaveModal: undefined });
     }
   }, [route.params?.openLeaveModal]);
@@ -77,12 +75,10 @@ const StudentDashboard = ({ navigation, route }) => { // Add route to props
       const response = await api.get("/student/dashboard-stats");
       const data = response.data.data || {};
       
-      // Calculate rejected count (both teacher and HOD rejected)
       const rejectedCount = (data.recentLeaves || []).filter(
         leave => leave.finalStatus === "rejected"
       ).length;
       
-      // Calculate total leaves
       const totalLeaves = (data.pendingLeaves || 0) + (data.approvedLeaves || 0) + rejectedCount;
       
       setStats({
@@ -160,87 +156,82 @@ const StudentDashboard = ({ navigation, route }) => { // Add route to props
     return Object.keys(newErrors).length === 0;
   };
 
-const handleSubmitLeave = async () => {
-  setErrors({});
+  const handleSubmitLeave = async () => {
+    setErrors({});
 
-  if (!validateForm()) {
-    return;
-  }
+    if (!validateForm()) {
+      return;
+    }
 
-  setSubmitting(true);
-  
-  const selectedLeaveType = leaveTypes.find(t => t._id === formData.leaveTypeId);
-  
-  // Create a temporary ID for optimistic update
-  const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
-  const optimisticLeave = {
-    _id: tempId,
-    leaveType: selectedLeaveType,
-    dateRange: {
-      from: formData.fromDate,
-      to: formData.toDate,
-      days: calculateDays(),
-    },
-    reason: formData.reason,
-    status: "pending",
-    finalStatus: "pending",
-  };
-
-  // Optimistically update UI
-  setRecentLeaves(prev => [optimisticLeave, ...prev].slice(0, 5));
-  setStats(prev => ({
-    ...prev,
-    pendingLeaves: prev.pendingLeaves + 1,
-    totalLeaves: prev.totalLeaves + 1,
-  }));
-
-  setModalVisible(false);
-  resetForm();
-
-  try {
-    const payload = {
-      leaveTypeId: formData.leaveTypeId.toString(),
-      fromDate: formData.fromDate.toISOString(),
-      toDate: formData.toDate.toISOString(),
-      reason: formData.reason.trim(),
-      halfDay: formData.halfDay,
-      days: calculateDays(),
+    setSubmitting(true);
+    
+    const selectedLeaveType = leaveTypes.find(t => t._id === formData.leaveTypeId);
+    
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    const optimisticLeave = {
+      _id: tempId,
+      leaveType: selectedLeaveType,
+      dateRange: {
+        from: formData.fromDate,
+        to: formData.toDate,
+        days: calculateDays(),
+      },
+      reason: formData.reason,
+      status: "pending",
+      finalStatus: "pending",
     };
 
-    const response = await api.post("/student/leave-request", payload);
-    
-    if (response.data?.data) {
-      // Replace the optimistic leave with the real one
-      setRecentLeaves(prev => {
-        const filtered = prev.filter(l => l._id !== tempId);
-        return [response.data.data, ...filtered].slice(0, 5);
-      });
-
-      Alert.alert(
-        "Success", 
-        "Leave request submitted successfully",
-        [{ text: "OK" }],
-        { cancelable: true }
-      );
-    }
-    
-  } catch (error) {
-    console.error("Submit error:", error);
-    // Remove the optimistic leave on error
-    setRecentLeaves(prev => prev.filter(l => l._id !== tempId));
-    // Revert stats on error
+    setRecentLeaves(prev => [optimisticLeave, ...prev].slice(0, 5));
     setStats(prev => ({
       ...prev,
-      pendingLeaves: prev.pendingLeaves - 1,
-      totalLeaves: prev.totalLeaves - 1,
+      pendingLeaves: prev.pendingLeaves + 1,
+      totalLeaves: prev.totalLeaves + 1,
     }));
-    fetchDashboardData(); // Refresh to correct state
-    Alert.alert("Error", error.response?.data?.message || "Failed to submit request");
-  } finally {
-    setSubmitting(false);
-  }
-};
+
+    setModalVisible(false);
+    resetForm();
+
+    try {
+      const payload = {
+        leaveTypeId: formData.leaveTypeId.toString(),
+        fromDate: formData.fromDate.toISOString(),
+        toDate: formData.toDate.toISOString(),
+        reason: formData.reason.trim(),
+        halfDay: formData.halfDay,
+        days: calculateDays(),
+      };
+
+      const response = await api.post("/student/leave-request", payload);
+      
+      if (response.data?.data) {
+        setRecentLeaves(prev => {
+          const filtered = prev.filter(l => l._id !== tempId);
+          return [response.data.data, ...filtered].slice(0, 5);
+        });
+
+        Alert.alert(
+          "Success", 
+          "Leave request submitted successfully",
+          [{ text: "OK" }],
+          { cancelable: true }
+        );
+      }
+      
+    } catch (error) {
+      console.error("Submit error:", error);
+      setRecentLeaves(prev => prev.filter(l => l._id !== tempId));
+      setStats(prev => ({
+        ...prev,
+        pendingLeaves: prev.pendingLeaves - 1,
+        totalLeaves: prev.totalLeaves - 1,
+      }));
+      fetchDashboardData();
+      Alert.alert("Error", error.response?.data?.message || "Failed to submit request");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const resetForm = () => {
     setFormData({
@@ -320,7 +311,6 @@ const handleSubmitLeave = async () => {
     },
   ];
 
-  // Get user's full name from context
   const getFullName = () => {
     if (user?.personalInfo) {
       return `${user.personalInfo.firstName || ""} ${user.personalInfo.lastName || ""}`.trim();
@@ -328,7 +318,6 @@ const handleSubmitLeave = async () => {
     return "Student";
   };
 
-  // Date Picker Component
   const DatePickerField = ({ label, date, onChange, error }) => {
     const [showPicker, setShowPicker] = useState(false);
 
@@ -471,7 +460,6 @@ const handleSubmitLeave = async () => {
             <Text style={styles.statTitle}>Approved</Text>
           </TouchableOpacity>
 
-          {/* Total stat */}
           <TouchableOpacity
             style={[styles.statCard, { borderLeftColor: COLORS.primary }]}
           >
@@ -487,7 +475,6 @@ const handleSubmitLeave = async () => {
             <Text style={styles.statTitle}>Total</Text>
           </TouchableOpacity>
 
-          {/* Rejected stat */}
           <TouchableOpacity
             style={[styles.statCard, { borderLeftColor: COLORS.danger }]}
           >
@@ -504,7 +491,7 @@ const handleSubmitLeave = async () => {
           </TouchableOpacity>
         </View>
 
-        {/* Recent Leaves with Download */}
+        {/* Recent Leaves with Download and View Form Buttons */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Requests</Text>
@@ -591,21 +578,28 @@ const handleSubmitLeave = async () => {
                     </View>
                   </View>
 
+                  {/* Action Buttons for Approved/Rejected Leaves */}
                   {(leave.finalStatus === "approved" ||
                     leave.finalStatus === "rejected") && (
-                    <TouchableOpacity
-                      style={styles.downloadButton}
-                      onPress={() => downloadLetter(leave._id)}
-                    >
-                      <Icon name="download" size={16} color={COLORS.primary} />
-                      <Text style={styles.downloadText}>
-                        Download{" "}
-                        {leave.finalStatus === "approved"
-                          ? "Approval"
-                          : "Rejection"}{" "}
-                        Letter
-                      </Text>
-                    </TouchableOpacity>
+                    <View style={styles.actionButtonsContainer}>
+                      <TouchableOpacity
+                        style={styles.viewFormButton}
+                        onPress={() => navigation.navigate("LeaveDetails", { leaveId: leave._id })}
+                      >
+                        <Icon name="file-document-outline" size={16} color={COLORS.info} />
+                        <Text style={styles.viewFormText}>View Form</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.downloadButton}
+                        onPress={() => downloadLetter(leave._id)}
+                      >
+                        <Icon name="download" size={16} color={COLORS.primary} />
+                        <Text style={styles.downloadText}>
+                          Download {leave.finalStatus === "approved" ? "Approval" : "Rejection"} Letter
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   )}
                 </View>
               ))
@@ -784,7 +778,6 @@ const handleSubmitLeave = async () => {
 };
 
 const styles = StyleSheet.create({
-  // ... (styles remain exactly the same as in your original code)
   container: { flex: 1, backgroundColor: COLORS.background },
   header: { paddingTop: 40, paddingHorizontal: 20, paddingBottom: 80 },
   headerTop: {
@@ -923,14 +916,38 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   statusText: { fontSize: 11, fontWeight: "600" },
+  
+  // New styles for action buttons
+  actionButtonsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+    gap: 8,
+  },
+  viewFormButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 8,
+    backgroundColor: COLORS.info + "10",
+    borderRadius: 8,
+    flex: 0.4,
+    justifyContent: "center",
+  },
+  viewFormText: {
+    marginLeft: 6,
+    fontSize: 12,
+    color: COLORS.info,
+    fontWeight: "600",
+  },
   downloadButton: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 8,
     padding: 8,
     backgroundColor: COLORS.primary + "10",
     borderRadius: 8,
-    alignSelf: "flex-start",
+    flex: 0.6,
+    justifyContent: "center",
   },
   downloadText: {
     marginLeft: 6,
@@ -938,6 +955,7 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: "600",
   },
+  
   emptyState: { alignItems: "center", paddingVertical: 40 },
   emptyText: { color: "#94A3B8", fontSize: 14, marginTop: 8, marginBottom: 16 },
   applyButton: {

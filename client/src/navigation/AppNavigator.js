@@ -45,6 +45,7 @@ import StudentDashboard from "../screens/student/StudentDashboard";
 import LeaveHistoryScreen from "../screens/student/LeaveHistoryScreen";
 import EditStudentProfileScreen from "../screens/student/EditStudentProfileScreen";
 import LeaveRequestScreen from "../screens/student/LeaveRequestScreen";
+import LeaveDetailsScreen from "../screens/student/LeaveDetailsScreen";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -612,11 +613,14 @@ const AppNavigator = () => {
                   headerShown: false,
                 }}
               />
+              <Stack.Screen
+                name="LeaveDetails"
+                component={LeaveDetailsScreen}
+                options={{
+                  headerShown: false,
+                }}
+              />
             </>
-          )}
-
-          {user?.role === USER_ROLES.STAFF && (
-            <Stack.Screen name="StaffMain" component={StudentTabs} />
           )}
         </>
       )}
