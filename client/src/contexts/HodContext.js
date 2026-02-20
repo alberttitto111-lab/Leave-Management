@@ -21,6 +21,7 @@ export const HodProvider = ({ children }) => {
     totalStudents: 0,
     pendingHodApprovals: 0,
     approvedByHod: 0,
+    rejectedByHod: 0, 
   });
   const [recentActivity, setRecentActivity] = useState([]);
   const [departmentName, setDepartmentName] = useState("");
@@ -56,22 +57,37 @@ export const HodProvider = ({ children }) => {
 
   // Fetch dashboard stats
   const fetchDashboardStats = useCallback(async () => {
+  try {
+    const res = await api.get("/hod/analytics");
+    const data = res.data.data || {};
+    
+    // Also fetch rejected leaves count
+    let rejectedCount = 0;
     try {
-      const res = await api.get("/hod/analytics");
-      const data = res.data.data || {};
-      
-      setStats({
-        totalTeachers: data.stats?.totalTeachers || 0,
-        totalStudents: data.stats?.totalStudents || 0,
-        pendingHodApprovals: data.stats?.pendingHodApprovals || 0,
-        approvedByHod: data.stats?.approvedByHod || 0,
-      });
-      
-      setRecentActivity(data.recentActivity || []);
-    } catch (error) {
-      console.error("Error fetching dashboard stats:", error);
+      const historyRes = await api.get("/hod/history");
+      if (historyRes.data.success) {
+        const history = historyRes.data.data || [];
+        rejectedCount = history.filter(leave => 
+          leave.status === "rejected_by_hod" || leave.finalStatus === "rejected"
+        ).length;
+      }
+    } catch (err) {
+      console.error("Error fetching rejected leaves:", err);
     }
-  }, []);
+    
+    setStats({
+      totalTeachers: data.stats?.totalTeachers || 0,
+      totalStudents: data.stats?.totalStudents || 0,
+      pendingHodApprovals: data.stats?.pendingHodApprovals || 0,
+      approvedByHod: data.stats?.approvedByHod || 0,
+      rejectedByHod: rejectedCount, // Set rejected count
+    });
+    
+    setRecentActivity(data.recentActivity || []);
+  } catch (error) {
+    console.error("Error fetching dashboard stats:", error);
+  }
+}, []);
 
   // Fetch department info
   const fetchDepartmentInfo = useCallback(async () => {

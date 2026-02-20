@@ -1,4 +1,4 @@
-// screens/HOD/HODStudentDetail.js
+// screens/HOD/HODTeacherDetail.js
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -29,21 +29,21 @@ const SectionHeader = ({ title }) => (
   <Text style={styles.sectionHeader}>{title}</Text>
 );
 
-const HodStudentDetail = ({ route, navigation }) => {
-  const { studentId } = route.params;
-  const [student, setStudent] = useState(null);
+const HODTeacherDetail = ({ route, navigation }) => {
+  const { teacherId } = route.params;
+  const [teacher, setTeacher] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadStudent = async () => {
+  const loadTeacher = async () => {
     try {
       setLoading(true);
-      const res = await api.get(`/hod/students/${studentId}`);
-      console.log("HOD Student data:", JSON.stringify(res.data.data, null, 2));
-      setStudent(res.data.data);
+      const res = await api.get(`/hod/teachers/${teacherId}`);
+      console.log("HOD Teacher data:", JSON.stringify(res.data.data, null, 2));
+      setTeacher(res.data.data);
     } catch (err) {
-      console.error("Failed to load student:", err);
-      Alert.alert("Error", "Failed to load student details");
+      console.error("Failed to load teacher:", err);
+      Alert.alert("Error", "Failed to load teacher details");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -51,12 +51,12 @@ const HodStudentDetail = ({ route, navigation }) => {
   };
 
   useEffect(() => {
-    loadStudent();
-  }, [studentId]);
+    loadTeacher();
+  }, [teacherId]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadStudent();
+    loadTeacher();
   };
 
   const handleBackPress = () => {
@@ -66,26 +66,26 @@ const HodStudentDetail = ({ route, navigation }) => {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#d13030" />
-        <Text style={{ marginTop: 10 }}>Loading student details...</Text>
+        <ActivityIndicator size="large" color="#d72c2c" />
+        <Text style={{ marginTop: 10 }}>Loading teacher details...</Text>
       </View>
     );
   }
 
-  if (!student) {
+  if (!teacher) {
     return (
       <View style={styles.center}>
         <Ionicons name="alert-circle" size={48} color="#CBD5E1" />
-        <Text style={{ marginTop: 10 }}>Student not found</Text>
+        <Text style={{ marginTop: 10 }}>Teacher not found</Text>
       </View>
     );
   }
 
-  const p = student.personalInfo || {};
-  const a = student.academicInfo || {};
+  const p = teacher.personalInfo || {};
+  const teaching = teacher.teachingInfo || {};
+  const professional = teacher.professionalDetails || {};
+  const department = teacher.departmentId || {};
   
-  // Safe access to department data
-  const department = student.departmentId || {};
   const departmentName = typeof department === 'object' ? department.name : null;
   const departmentCode = typeof department === 'object' ? department.code : null;
 
@@ -107,10 +107,10 @@ const HodStudentDetail = ({ route, navigation }) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#d13030" />
+      <StatusBar barStyle="light-content" backgroundColor="#d72c2c" />
 
       {/* Fixed Header with Back Button */}
-      <View style={[styles.header, { backgroundColor: "#d13030" }]}>
+      <View style={[styles.header, { backgroundColor: "#d72c2c" }]}>
         <View style={styles.headerTop}>
           <TouchableOpacity
             onPress={handleBackPress}
@@ -119,7 +119,7 @@ const HodStudentDetail = ({ route, navigation }) => {
             <Ionicons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
           <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>Student Profile</Text>
+            <Text style={styles.headerTitle}>Teacher Profile</Text>
             <Text style={styles.headerSubtitle}>
               {p.firstName || ""} {p.lastName || ""}
             </Text>
@@ -139,8 +139,8 @@ const HodStudentDetail = ({ route, navigation }) => {
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={onRefresh}
-            colors={["#d13030"]}
-            tintColor="#d13030"
+            colors={["#d72c2c"]}
+            tintColor="#d72c2c"
           />
         }
       >
@@ -150,26 +150,17 @@ const HodStudentDetail = ({ route, navigation }) => {
         {/* Account Information */}
         <View style={styles.formCard}>
           <SectionHeader title="Account Information" />
-          <InfoRow label="User ID" value={student.userId} />
-          <InfoRow label="Role" value={student.role} />
-          <InfoRow label="Status" value={student.isActive ? "Active" : "Inactive"} />
+          <InfoRow label="User ID" value={teacher.userId} />
+          <InfoRow label="Role" value={teacher.role} />
+          <InfoRow label="Status" value={teacher.isActive ? "Active" : "Inactive"} />
           <InfoRow 
             label="Last Login" 
-            value={student.lastLogin ? new Date(student.lastLogin).toLocaleString() : "Never"} 
+            value={teacher.lastLogin ? new Date(teacher.lastLogin).toLocaleString() : "Never"} 
           />
           <InfoRow 
             label="Member Since" 
-            value={student.createdAt ? new Date(student.createdAt).toLocaleDateString() : "N/A"} 
+            value={teacher.createdAt ? new Date(teacher.createdAt).toLocaleDateString() : "N/A"} 
           />
-        </View>
-
-        {/* Academic Information */}
-        <View style={styles.formCard}>
-          <SectionHeader title="Academic Information" />
-          <InfoRow label="Roll Number" value={a.rollNumber} />
-          <InfoRow label="Class" value={a.class} />
-          <InfoRow label="Section" value={a.section} />
-          <InfoRow label="Batch Year" value={a.batchYear?.toString()} />
         </View>
 
         {/* Department Information */}
@@ -193,24 +184,43 @@ const HodStudentDetail = ({ route, navigation }) => {
           <InfoRow label="Address" value={p.address} />
         </View>
 
-        {/* Parent/Guardian Information (if available) */}
-        {/* {a.parentDetails && (
-          <View style={styles.formCard}>
-            <SectionHeader title="Parent / Guardian Information" />
-            {a.parentDetails.fatherName && (
-              <InfoRow label="Father's Name" value={a.parentDetails.fatherName} />
-            )}
-            {a.parentDetails.motherName && (
-              <InfoRow label="Mother's Name" value={a.parentDetails.motherName} />
-            )}
-            {a.parentDetails.parentPhone && (
-              <InfoRow label="Parent Phone" value={a.parentDetails.parentPhone} />
-            )}
-            {a.parentDetails.parentEmail && (
-              <InfoRow label="Parent Email" value={a.parentDetails.parentEmail} />
-            )}
-          </View>
-        )} */}
+        {/* Professional Information */}
+        {/* <View style={styles.formCard}>
+          <SectionHeader title="Professional Information" />
+          {professional.bio && (
+            <InfoRow label="Bio" value={professional.bio} />
+          )}
+          {professional.qualification && (
+            <InfoRow label="Qualification" value={professional.qualification} />
+          )}
+          {professional.experience && (
+            <InfoRow label="Experience" value={professional.experience} />
+          )}
+          {professional.specialization && (
+            <InfoRow label="Specialization" value={professional.specialization} />
+          )}
+        </View> */}
+
+        {/* Teaching Information */}
+        <View style={styles.formCard}>
+          <SectionHeader title="Teaching Information" />
+          {teaching.subjects && teaching.subjects.length > 0 ? (
+            <InfoRow label="Subjects" value={teaching.subjects.join(", ")} />
+          ) : (
+            <InfoRow label="Subjects" value="No subjects assigned" />
+          )}
+          
+          {teaching.classSections && teaching.classSections.length > 0 ? (
+            <InfoRow label="Classes" value={teaching.classSections.join(", ")} />
+          ) : (
+            <InfoRow label="Classes" value="No classes assigned" />
+          )}
+          
+          <InfoRow 
+            label="Class Teacher" 
+            value={teaching.isClassTeacher ? "Yes" : "No"} 
+          />
+        </View>
 
         {/* Bottom padding */}
         <View style={{ height: 40 }} />
@@ -291,7 +301,7 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#d13030",
+    color: "#d72c2c",
     marginBottom: 15,
   },
   infoRow: {
@@ -316,4 +326,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default HodStudentDetail;
+export default HODTeacherDetail;

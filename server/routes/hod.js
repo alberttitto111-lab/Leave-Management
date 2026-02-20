@@ -456,4 +456,35 @@ router.get("/students/:id", protect, onlyHod, async (req, res) => {
   }
 });
 
+/* ---------------- HOD TEACHER DETAILS ---------------- */
+
+router.get("/teachers/:id", protect, onlyHod, async (req, res) => {
+  try {
+    const teacher = await User.findOne({
+      _id: req.params.id,
+      role: "teacher",
+    })
+      .select("-password")
+      .populate("departmentId", "name code");
+
+    if (!teacher) {
+      return res.status(404).json({
+        success: false,
+        message: "Teacher not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: teacher,
+    });
+  } catch (err) {
+    console.error("HOD teacher details error:", err);
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
 export default router;

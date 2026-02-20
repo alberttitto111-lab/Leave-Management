@@ -18,11 +18,14 @@ import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { COLORS } from "../../utils/constants";
 
-const HEADER_HEIGHT = 100;
+const HEADER_HEIGHT = 120;
+
+/* ----------------------------- CARD ----------------------------- */
 
 const TeacherCard = ({ teacher, onPress }) => {
   const personalInfo = teacher.personalInfo || {};
   const teachingInfo = teacher.teachingInfo || {};
+  const department = teacher.departmentId || {};
 
   return (
     <TouchableOpacity style={styles.card} onPress={() => onPress(teacher)}>
@@ -37,15 +40,27 @@ const TeacherCard = ({ teacher, onPress }) => {
           {personalInfo.firstName || ""} {personalInfo.lastName || ""}
         </Text>
         <Text style={styles.details}>
-          {teachingInfo.subjects?.join(", ") || "No subjects"} 
-          {teachingInfo.isClassTeacher && " • Class Teacher"}
+          {teachingInfo.subjects?.join(", ") || "No subjects"}
         </Text>
-        <Text style={styles.id}>{teacher.userId}</Text>
+        <View style={styles.idContainer}>
+          <Text style={styles.id}>{teacher.userId}</Text>
+        </View>
+        {teachingInfo.isClassTeacher && (
+          <View style={styles.badgeContainer}>
+            <Ionicons name="star" size={12} color="#d72c2c" />
+            <Text style={styles.badgeText}>Class Teacher</Text>
+          </View>
+        )}
+        {department.name && (
+          <Text style={styles.department}>{department.name}</Text>
+        )}
       </View>
       <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
     </TouchableOpacity>
   );
 };
+
+/* ----------------------------- MAIN ----------------------------- */
 
 const DepartmentTeachers = ({ navigation }) => {
   const [teachers, setTeachers] = useState([]);
@@ -62,6 +77,8 @@ const DepartmentTeachers = ({ navigation }) => {
     filterTeachers();
   }, [searchQuery, teachers]);
 
+  /* ----------------------------- LOAD ----------------------------- */
+
   const loadTeachers = async () => {
     try {
       const response = await api.get("/hod/teachers");
@@ -69,7 +86,16 @@ const DepartmentTeachers = ({ navigation }) => {
       
       // Accept multiple backend shapes safely
       const list = response?.data?.data || response?.data || [];
-      setTeachers(Array.isArray(list) ? list : []);
+      const teachersList = Array.isArray(list) ? list : [];
+      
+      // Sort teachers by name alphabetically
+      const sortedTeachers = teachersList.sort((a, b) => {
+        const nameA = `${a.personalInfo?.firstName || ""} ${a.personalInfo?.lastName || ""}`.toLowerCase();
+        const nameB = `${b.personalInfo?.firstName || ""} ${b.personalInfo?.lastName || ""}`.toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+
+      setTeachers(sortedTeachers);
     } catch (error) {
       console.error("Load teachers error:", error);
       Alert.alert("Error", "Failed to load teachers");
@@ -79,6 +105,8 @@ const DepartmentTeachers = ({ navigation }) => {
       setRefreshing(false);
     }
   };
+
+  /* ----------------------------- FILTER ----------------------------- */
 
   const filterTeachers = () => {
     if (!searchQuery) {
@@ -97,8 +125,17 @@ const DepartmentTeachers = ({ navigation }) => {
       );
     });
 
-    setFilteredTeachers(filtered);
+    // Keep filtered teachers sorted
+    const sortedFiltered = filtered.sort((a, b) => {
+      const nameA = `${a.personalInfo?.firstName || ""} ${a.personalInfo?.lastName || ""}`.toLowerCase();
+      const nameB = `${b.personalInfo?.firstName || ""} ${b.personalInfo?.lastName || ""}`.toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
+    setFilteredTeachers(sortedFiltered);
   };
+
+  /* ----------------------------- HANDLERS ----------------------------- */
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -107,32 +144,35 @@ const DepartmentTeachers = ({ navigation }) => {
 
   const handleTeacherPress = (teacher) => {
     // Navigate to teacher details or show options
-    Alert.alert(
-      "Teacher Details",
-      `${teacher.personalInfo?.firstName} ${teacher.personalInfo?.lastName}`,
-      [
-        { text: "OK" },
-        { 
-          text: "View Details", 
-          onPress: () => {
-            // Navigate to teacher detail screen if available
-            // navigation.navigate("TeacherDetail", { teacherId: teacher._id });
-          } 
-        }
-      ]
-    );
+      navigation.navigate("HODTeacherDetail", { teacherId: teacher._id });
+    // Alert.alert(
+    //   "Teacher Details",
+    //   `${teacher.personalInfo?.firstName} ${teacher.personalInfo?.lastName}`,
+    //   [
+    //     { text: "OK" },
+    //     { 
+    //       text: "View Details", 
+    //       onPress: () => {
+    //         // Navigate to teacher detail screen if available
+    //         // navigation.navigate("TeacherDetail", { teacherId: teacher._id });
+    //       } 
+    //     }
+    //   ]
+    // );
   };
 
   const handleBackPress = () => {
     navigation.goBack();
   };
 
+  /* ----------------------------- UI ----------------------------- */
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.hod || "#6366F1"} />
+      <StatusBar barStyle="light-content" backgroundColor="#d72c2c" />
       
       {/* Fixed Header with Back Button */}
-      <View style={[styles.header, { backgroundColor:  "#d72c2c"  }]}>
+      <View style={[styles.header, { backgroundColor: "#d72c2c" }]}>
         <View style={styles.headerTop}>
           <TouchableOpacity
             onPress={handleBackPress}
@@ -185,8 +225,8 @@ const DepartmentTeachers = ({ navigation }) => {
             <RefreshControl 
               refreshing={refreshing} 
               onRefresh={onRefresh}
-              colors={[COLORS.hod || "#6366F1"]}
-              tintColor={COLORS.hod || "#6366F1"}
+              colors={["#d72c2c"]}
+              tintColor="#d72c2c"
             />
           }
         >
@@ -195,7 +235,7 @@ const DepartmentTeachers = ({ navigation }) => {
 
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={COLORS.hod || "#6366F1"} />
+              <ActivityIndicator size="large" color="#d72c2c" />
               <Text style={styles.loadingText}>Loading teachers...</Text>
             </View>
           ) : filteredTeachers.length === 0 ? (
@@ -225,6 +265,8 @@ const DepartmentTeachers = ({ navigation }) => {
     </View>
   );
 };
+
+/* ----------------------------- STYLES ----------------------------- */
 
 const styles = StyleSheet.create({
   container: {
@@ -313,7 +355,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#64748B",
   },
-  // Card styles
+  // Card styles - matching Department Students
   card: {
     flexDirection: "row",
     alignItems: "center",
@@ -338,7 +380,7 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 18,
     fontWeight: "bold",
-    color: COLORS.hod || "#6366F1",
+    color: "#d72c2c",
   },
   info: {
     flex: 1,
@@ -353,10 +395,40 @@ const styles = StyleSheet.create({
     color: "#64748B",
     marginTop: 2,
   },
+  idContainer: {
+    alignSelf: "flex-start",
+    marginTop: 2,
+  },
   id: {
     fontSize: 12,
-    color: "#94A3B8",
+    color: "#444546",
+    backgroundColor: "#1c46ff2c",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  badgeContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#d7262649",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    alignSelf: "flex-start",
+    marginTop: 4,
+    gap: 4,
+  },
+  badgeText: {
+    fontSize: 10,
+    color: "#d72c2c",
+    fontWeight: "600",
+  },
+  department: {
+    fontSize: 11,
+    color: "#d72c2c",
     marginTop: 2,
+    fontWeight: "500",
   },
   // Empty state
   emptyState: {
@@ -372,7 +444,7 @@ const styles = StyleSheet.create({
   clearSearchText: {
     marginTop: 10,
     fontSize: 14,
-    color: COLORS.hod || "#6366F1",
+    color: "#d72c2c",
     fontWeight: "600",
   },
 });

@@ -48,25 +48,25 @@ const HodDashboard = ({ navigation }) => {
       title: "Leave Approvals",
       icon: "file-check",
       screen: "HodLeaveApprovals",
-      color: COLORS.warning,
+      color: "#ff8801",
     },
     {
       title: "Teachers",
       icon: "account-tie",
       screen: "DepartmentTeachers",
-      color: COLORS.primary,
+      color: "#1c73dd",
     },
     {
       title: "Students",
       icon: "school",
       screen: "DepartmentStudents",
-      color: COLORS.info,
+      color: "#cd10e2",
     },
     {
       title: "HOD Profile",
       icon: "account-circle",
       screen: "HodProfile",
-      color: "#d13030",
+      color: "#61d309",
     },
   ];
 
@@ -153,34 +153,42 @@ const HodDashboard = ({ navigation }) => {
           />
         }
       >
-        {/* Stats */}
+        {/* Stats - Now with 5 cards in a grid */}
         <View style={styles.statsContainer}>
           <StatCard
-            color={COLORS.primary}
+            color="#1c73dd"
             icon="account-tie"
             value={stats.totalTeachers}
             title="Teachers"
           />
 
           <StatCard
-            color={COLORS.info}
+            color="#cd10e2"
             icon="school"
             value={stats.totalStudents}
             title="Students"
           />
 
           <StatCard
-            color={COLORS.warning}
+            color="#ff8801"
             icon="clock-alert"
             value={stats.pendingHodApprovals}
             title="Pending Approvals"
           />
 
           <StatCard
-            color={COLORS.success}
+            color="#61d309"
             icon="check-circle"
             value={stats.approvedByHod}
             title="Approved"
+          />
+
+          {/* New Rejected Stat Card */}
+          <StatCard
+            color="#EF4444" // Red color for rejected
+            icon="close-circle"
+            value={stats.rejectedByHod || 0}
+            title="Rejected"
           />
         </View>
 
@@ -296,16 +304,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     borderRadius: 20,
     alignSelf: "flex-start",
-    gap: 3,
+    gap: 0,
   },
   departmentBadgeText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "600",
     color: "#ffffff",
-    padding: 3
+    padding: 3,
   },
   logoutButton: {
     padding: 10,

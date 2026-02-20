@@ -332,7 +332,7 @@ const handleApprove = async (leaveId) => {
 
         {/* Status Summary Card */}
         <View style={styles.summaryContainer}>
-          <View style={[styles.summaryCard, { borderLeftColor: "#F59E0B" }]}>
+          <View style={[styles.summaryCard, { borderLeftColor: "#ffa50a" }]}>
             <Text style={styles.summaryNumber}>{stats.pending}</Text>
             <Text style={styles.summaryLabel}>Pending Approval</Text>
           </View>
