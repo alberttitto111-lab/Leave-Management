@@ -36,7 +36,11 @@ const InputField = ({
         style={styles.inputIcon}
       />
       <TextInput
-        style={styles.input}
+        // style={styles.input}
+        style={[
+          styles.input,
+          Platform.OS === "web" && { outline: "none" } // Remove black rectangle on web
+        ]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}

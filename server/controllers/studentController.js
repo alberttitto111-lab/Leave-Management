@@ -86,9 +86,9 @@ export const getLeaveTypes = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Create leave request
-// @route   POST /api/student/leave-request
-// @access  Private/Student
+// @desc Create leave request
+// @route POST /api/student/leave-request
+// @access Private/Student
 export const createLeaveRequest = asyncHandler(async (req, res) => {
   const { leaveTypeId, fromDate, toDate, reason, halfDay, halfDayType } =
     req.body;

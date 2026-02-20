@@ -77,8 +77,8 @@ const LoginScreen = ({ navigation }) => {
           <View style={styles.logoContainer}>
             <Icon name="calendar-check" size={48} color={COLORS.white} />
           </View>
-          <Text style={styles.title}>Leave Management</Text>
-          <Text style={styles.subtitle}>Academic Portal</Text>
+          <Text style={styles.title}>CampX</Text>
+          <Text style={styles.subtitle}>Leave Management - Academic Portal</Text>
         </View>
       </View>
 

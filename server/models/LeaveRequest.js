@@ -58,6 +58,7 @@ const leaveRequestSchema = new mongoose.Schema(
         "approved_by_teacher",
         "approved_by_hod",
         "rejected",
+        "rejected_by_hod", // Add this
         "cancelled",
       ],
       default: "pending",

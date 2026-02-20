@@ -1,3 +1,4 @@
+// screens/HOD/HodDashboard.js
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -28,6 +29,7 @@ const HodDashboard = ({ navigation }) => {
 
   const [recentActivity, setRecentActivity] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [departmentName, setDepartmentName] = useState("");
 
   const fetchDashboardData = async () => {
     try {
@@ -41,40 +43,66 @@ const HodDashboard = ({ navigation }) => {
     }
   };
 
+  const fetchDepartmentInfo = async () => {
+    try {
+      // Fetch HOD's department info
+      const res = await api.get("/hod/department-info");
+      if (res.data.success) {
+        setDepartmentName(res.data.data.departmentName || "");
+      }
+    } catch (err) {
+      console.error("Failed to fetch department info:", err);
+      
+      // Fallback: Try to get department from user object
+      if (user?.departmentId?.name) {
+        setDepartmentName(user.departmentId.name);
+      } else if (user?.departmentId) {
+        // If we have department ID but not name, fetch it separately
+        try {
+          const deptRes = await api.get(`/admin/departments/${user.departmentId}`);
+          setDepartmentName(deptRes.data.name);
+        } catch (deptErr) {
+          console.error("Failed to fetch department details:", deptErr);
+        }
+      }
+    }
+  };
+
   useEffect(() => {
     fetchDashboardData();
+    fetchDepartmentInfo();
   }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchDashboardData();
+    await Promise.all([fetchDashboardData(), fetchDepartmentInfo()]);
     setRefreshing(false);
   };
 
   const quickActions = [
     {
-      title: "Leave Approvals",
+      title: "Leave Requests",
       icon: "file-check",
       screen: "HodLeaveApprovals",
-      color: COLORS.warning,
+      color: "#f5880b",
     },
     {
       title: "Teachers",
       icon: "account-tie",
       screen: "DepartmentTeachers",
-      color: COLORS.primary,
+      color: "#1f79f7",
     },
     {
       title: "Students",
       icon: "school",
       screen: "DepartmentStudents",
-      color: COLORS.info,
+      color: "#cd20b6",
     },
     {
-      title: "Department",
-      icon: "office-building",
-      screen: "DepartmentProfile",
-      color: COLORS.success,
+      title: "My Profile", // Changed from "Department" to "HOD Profile"
+      icon: "account-circle", // Changed icon to profile icon
+      screen: "HodProfile", // Updated screen name
+      color: "#0cb706", // Using header color for consistency
     },
   ];
 
@@ -82,19 +110,25 @@ const HodDashboard = ({ navigation }) => {
     <View style={styles.container}>
       <StatusBar
         barStyle="light-content"
-        backgroundColor={COLORS.hod || "#7C3AED"}
+        backgroundColor="#d13030" // Matching header color
       />
 
       {/* Header */}
-      <View
-        style={[styles.header, { backgroundColor: COLORS.hod || "#7C3AED" }]}
-      >
+      <View style={[styles.header, { backgroundColor: "#d13030" }]}>
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.greeting}>Welcome back,</Text>
             <Text style={styles.userName}>
               {user?.personalInfo?.firstName || "HOD"}
             </Text>
+            
+            {/* Department Badge */}
+            {departmentName ? (
+              <View style={styles.departmentBadge}>
+                <Icon name="star" size={14} color="#ffdd00" />
+                <Text style={styles.departmentBadgeText}>{departmentName}</Text>
+              </View>
+            ) : null}
           </View>
 
           <TouchableOpacity onPress={logout} style={styles.logoutButton}>
@@ -113,28 +147,28 @@ const HodDashboard = ({ navigation }) => {
         {/* Stats */}
         <View style={styles.statsContainer}>
           <StatCard
-            color={COLORS.primary}
+            color= "#1f7ff4"
             icon="account-tie"
             value={stats.totalTeachers}
             title="Teachers"
           />
 
           <StatCard
-            color={COLORS.info}
+            color= "#c61ff4"
             icon="school"
             value={stats.totalStudents}
             title="Students"
           />
 
           <StatCard
-            color={COLORS.warning}
+            color= "#f4911f"
             icon="clock-alert"
             value={stats.pendingHodApprovals}
             title="Pending Approvals"
           />
 
           <StatCard
-            color={COLORS.success}
+            color= "#17cf1d"
             icon="check-circle"
             value={stats.approvedByHod}
             title="Approved"
@@ -215,39 +249,71 @@ const StatCard = ({ icon, title, value, color }) => (
 );
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-
-  header: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 80 },
-
+  container: { 
+    flex: 1, 
+    backgroundColor: "#f3e1e1", 
+  },
+  header: { 
+    paddingHorizontal: 20, 
+    paddingTop: 40,
+    paddingBottom: 30,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5, 
+  },
   headerTop: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "flex-start",
+    paddingHorizontal: 20,
   },
-
-  greeting: { fontSize: 14, color: COLORS.white, opacity: 0.8 },
-
+  greeting: { 
+    fontSize: 14,
+    color: "rgba(255,255,255,0.9)",
+    marginBottom: 4,
+    fontWeight: "500",
+  },
   userName: {
     fontSize: 24,
     fontWeight: "bold",
-    color: COLORS.white,
-    marginTop: 4,
+    color: "#fff",
+    marginBottom: 8,
   },
-
+  // Department Badge styles
+  departmentBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.2)",
+    paddingHorizontal: 6,
+    borderRadius: 20,
+    alignSelf: "flex-start",
+    gap: 3,
+  },
+  departmentBadgeText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#ffffff",
+    padding: 3
+  },
   logoutButton: {
-    padding: 8,
+    padding: 10,
     borderRadius: 12,
     backgroundColor: "rgba(255,255,255,0.2)",
   },
-
-  content: { marginTop: -60 },
-
+  content: { 
+    // marginTop: 10, 
+  },
   statsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
     paddingHorizontal: 20,
     gap: 12,
+    marginTop: 10, 
   },
-
   statCard: {
     width: (width - 52) / 2,
     backgroundColor: COLORS.white,
@@ -255,9 +321,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderLeftWidth: 4,
     elevation: 2,
-    marginBottom: 12,
   },
-
   iconContainer: {
     width: 40,
     height: 40,
@@ -266,20 +330,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
   },
-
-  statValue: { fontSize: 22, fontWeight: "bold" },
-  statTitle: { fontSize: 12, color: COLORS.slate },
-
-  section: { marginTop: 24, paddingHorizontal: 20 },
-
+  statValue: { 
+    fontSize: 22, 
+    fontWeight: "bold", 
+  },
+  statTitle: { 
+    fontSize: 12, 
+    color: COLORS.slate, 
+  },
+  section: { 
+    marginTop: 24, 
+    paddingHorizontal: 20, 
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "700",
     marginBottom: 16,
   },
-
-  actionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-
+  actionsGrid: { 
+    flexDirection: "row", 
+    flexWrap: "wrap", 
+    gap: 12, 
+  },
   actionCard: {
     width: (width - 52) / 2,
     backgroundColor: COLORS.white,
@@ -287,9 +359,7 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: "center",
     elevation: 2,
-    marginBottom: 12,
   },
-
   actionIcon: {
     width: 56,
     height: 56,
@@ -298,23 +368,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
-
-  actionTitle: { fontWeight: "600" },
-
+  actionTitle: { 
+    fontWeight: "600", 
+  },
   activityContainer: {
     backgroundColor: COLORS.white,
     borderRadius: 16,
     padding: 16,
     marginBottom: 20,
   },
-
   activityItem: {
     flexDirection: "row",
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
-
   activityIndicator: {
     width: 32,
     height: 32,
@@ -324,9 +392,14 @@ const styles = StyleSheet.create({
     marginRight: 12,
     backgroundColor: "#EEF2FF",
   },
-
-  emptyState: { alignItems: "center", paddingVertical: 40 },
-  emptyText: { marginTop: 8, color: "#94A3B8" },
+  emptyState: { 
+    alignItems: "center", 
+    paddingVertical: 40, 
+  },
+  emptyText: { 
+    marginTop: 8, 
+    color: "#94A3B8", 
+  },
 });
 
 export default HodDashboard;

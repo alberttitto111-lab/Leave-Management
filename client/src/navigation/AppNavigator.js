@@ -25,6 +25,7 @@ import HODDashboard from "../screens/HOD/HODDashboard";
 import HodLeaveApprovals from "../screens/HOD/HodLeaveApprovals";
 import DepartmentTeachers from "../screens/HOD/DepartmentTeachers";
 import DepartmentStudents from "../screens/HOD/DepartmentStudents";
+import HodProfile from "../screens/HOD/HodProfile";
 
 // Teacher Screens
 import TeacherDashboard from "../screens/teacher/TeacherDashboard";
@@ -33,15 +34,12 @@ import StudentList from "../screens/teacher/StudentList";
 import StudentDetail from "../screens/teacher/StudentDetail";
 import TeacherLeaveRequestsScreen from "../screens/teacher/TeacherLeaveRequestsScreen";
 import TeacherLeaveHistoryScreen from "../screens/teacher/TeacherLeaveHistoryScreen";
-
-// Import the new screens
 import TeacherApprovalsScreen from "../screens/teacher/TeacherApprovalsScreen";
 import TeacherRejectedScreen from "../screens/teacher/TeacherRejectedScreen";
 
 // Student Screens
 import StudentDashboard from "../screens/student/StudentDashboard";
 import LeaveHistoryScreen from "../screens/student/LeaveHistoryScreen";
-
 import EditStudentProfileScreen from "../screens/student/EditStudentProfileScreen";
 
 const Stack = createStackNavigator();
@@ -293,24 +291,38 @@ const HODTabs = () => (
 
         if (route.name === "Dashboard")
           iconName = focused ? "home" : "home-outline";
-        else if (route.name === "Approvals")
-          iconName = focused ? "checkmark-circle" : "checkmark-circle-outline";
-        else if (route.name === "Reports")
-          iconName = focused ? "bar-chart" : "bar-chart-outline";
+        else if (route.name === "Leave Requests")
+          iconName = focused ? "document-text" : "document-text-outline";
+        // else if (route.name === "Approvals")
+        //   iconName = focused ? "checkmark-circle" : "checkmark-circle-outline";
+        // else if (route.name === "Rejected")
+        //   iconName = focused ? "close-circle" : "close-circle-outline";
+        else if (route.name === "My Profile")
+          iconName = focused ? "person" : "person-outline";
 
         return <Ionicons name={iconName} size={size} color={color} />;
       },
-      tabBarActiveTintColor: "#4338CA",
+      tabBarActiveTintColor: "#ca3838",
       tabBarInactiveTintColor: "gray",
     })}
   >
-    <Tab.Screen name="Dashboard" component={HODDashboard} />
+    <Tab.Screen name="Dashboard"
+    options={{
+                  headerShown: false,
+                  title: "Dashboard",
+    }}
+    component={HODDashboard} />
     <Tab.Screen
-      name="Approvals"
+      name="Leave Requests"
       component={HodLeaveApprovals}
       options={{ headerShown: false }}
     />
-    <Tab.Screen name="Reports" component={HODDashboard} />
+    <Tab.Screen name="My Profile"
+    options={{
+                  headerShown: false,
+                  title: "My Profile",
+    }}
+    component={HodProfile} />
   </Tab.Navigator>
 );
 
@@ -468,15 +480,27 @@ const AppNavigator = () => {
               <Stack.Screen
                 name="HodLeaveApprovals"
                 component={HodLeaveApprovals}
-                options={{ title: "Leave Approvals" }}
+                options={{ headerShown: false }}
               />
               <Stack.Screen
                 name="DepartmentTeachers"
                 component={DepartmentTeachers}
+                options={{ headerShown: false }}
               />
               <Stack.Screen
                 name="DepartmentStudents"
                 component={DepartmentStudents}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="HodProfile"
+                component={HodProfile}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="StudentDetail"
+                component={StudentDetail}
+                options={{ headerShown: true }}
               />
             </>
           )}

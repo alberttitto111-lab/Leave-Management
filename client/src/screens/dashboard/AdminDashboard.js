@@ -350,12 +350,15 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.35)",
     marginTop: 10,
   },
-  content: { flex: 1, marginTop: 6 },  ///change to create a small gap between header and content
+  content: { flex: 1,
+    //  marginTop: 6 
+    },  ///change to create a small gap between header and content
   statsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
     paddingHorizontal: 20,
     gap: 12,
+    marginTop: 10,
   },
   statCard: {
     width: (width - 52) / 2,
