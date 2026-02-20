@@ -35,7 +35,14 @@ const LeaveHistoryScreen = ({ navigation }) => {
 
   useEffect(() => {
     fetchLeaves();
-  }, []);
+    
+    // Add focus listener to refresh data when tab is focused
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchLeaves();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -104,46 +111,68 @@ const LeaveHistoryScreen = ({ navigation }) => {
     }
   };
 
-  const filteredLeaves = leaves.filter((leave) =>
-    filter === "all" ? true : leave.status === filter,
-  );
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "approved":
-        return COLORS.success;
+  // Filter leaves based on selected tab
+  const getFilteredLeaves = () => {
+    switch (filter) {
+      case "all":
+        return leaves; // All leave requests
+        
       case "pending":
-        return COLORS.warning;
+        return leaves.filter((leave) => 
+          leave.finalStatus === "pending" && 
+          (leave.status === "pending" || leave.status === "approved_by_teacher")
+        ); // Leaves that are still pending (not final)
+        
+      case "approved":
+        return leaves.filter((leave) => 
+          leave.finalStatus === "approved" || 
+          leave.status === "approved_by_hod"
+        ); // Leaves approved by both teacher and HOD
+      
       case "rejected":
-        return COLORS.danger;
+        return leaves.filter((leave) => 
+          leave.finalStatus === "rejected"
+        ); // Leaves rejected by either teacher or HOD
+        
       default:
-        return COLORS.slate;
+        return leaves;
     }
   };
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case "approved":
-        return "check-circle";
-      case "pending":
-        return "clock-outline";
-      case "rejected":
-        return "close-circle";
-      default:
-        return "help-circle";
-    }
+  const getStatusColor = (leave) => {
+    if (leave.finalStatus === "approved") return COLORS.success;
+    if (leave.finalStatus === "rejected") return COLORS.danger;
+    if (leave.status === "approved_by_teacher") return COLORS.info;
+    return COLORS.warning;
   };
+
+  const getStatusIcon = (leave) => {
+    if (leave.finalStatus === "approved") return "check-circle";
+    if (leave.finalStatus === "rejected") return "close-circle";
+    if (leave.status === "approved_by_teacher") return "clock-alert";
+    return "clock-outline";
+  };
+
+  const getStatusText = (leave) => {
+    if (leave.finalStatus === "approved") return "APPROVED";
+    if (leave.finalStatus === "rejected") return "REJECTED";
+    if (leave.status === "approved_by_teacher") return "PENDING HOD";
+    return "PENDING";
+  };
+
+  const filteredLeaves = getFilteredLeaves();
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Icon name="arrow-left" size={24} color={COLORS.white} />
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Icon name="arrow-left" size={24} color= "#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Leave History</Text>
         <View style={{ width: 24 }} />
       </View>
 
+      {/* Filter Tabs */}
       <View style={styles.filterContainer}>
         {["all", "pending", "approved", "rejected"].map((f) => (
           <TouchableOpacity
@@ -166,16 +195,44 @@ const LeaveHistoryScreen = ({ navigation }) => {
         ))}
       </View>
 
+      {/* Count Summary */}
+      <View style={styles.summaryContainer}>
+        <View style={styles.summaryItem}>
+          <Text style={styles.summaryLabel}>Total</Text>
+          <Text style={styles.summaryValue}>{leaves.length}</Text>
+        </View>
+        <View style={styles.summaryItem}>
+          <Text style={[styles.summaryLabel, { color: COLORS.warning }]}>Pending</Text>
+          <Text style={styles.summaryValue}>
+            {leaves.filter(l => l.finalStatus === "pending").length}
+          </Text>
+        </View>
+        <View style={styles.summaryItem}>
+          <Text style={[styles.summaryLabel, { color: COLORS.success }]}>Approved</Text>
+          <Text style={styles.summaryValue}>
+            {leaves.filter(l => l.finalStatus === "approved").length}
+          </Text>
+        </View>
+        <View style={styles.summaryItem}>
+          <Text style={[styles.summaryLabel, { color: COLORS.danger }]}>Rejected</Text>
+          <Text style={styles.summaryValue}>
+            {leaves.filter(l => l.finalStatus === "rejected").length}
+          </Text>
+        </View>
+      </View>
+
       <ScrollView
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         style={styles.content}
+        showsVerticalScrollIndicator={true}
+        persistentScrollbar={true}
       >
         {filteredLeaves.length === 0 ? (
           <View style={styles.emptyState}>
             <Icon name="calendar-blank" size={64} color="#CBD5E1" />
-            <Text style={styles.emptyText}>No leave requests found</Text>
+            <Text style={styles.emptyText}>No {filter} leave requests found</Text>
           </View>
         ) : (
           filteredLeaves.map((leave) => (
@@ -188,21 +245,21 @@ const LeaveHistoryScreen = ({ navigation }) => {
                 <View
                   style={[
                     styles.statusBadge,
-                    { backgroundColor: getStatusColor(leave.status) + "20" },
+                    { backgroundColor: getStatusColor(leave) + "20" },
                   ]}
                 >
                   <Icon
-                    name={getStatusIcon(leave.status)}
+                    name={getStatusIcon(leave)}
                     size={14}
-                    color={getStatusColor(leave.status)}
+                    color={getStatusColor(leave)}
                   />
                   <Text
                     style={[
                       styles.statusText,
-                      { color: getStatusColor(leave.status) },
+                      { color: getStatusColor(leave) },
                     ]}
                   >
-                    {leave.status?.toUpperCase()}
+                    {getStatusText(leave)}
                   </Text>
                 </View>
               </View>
@@ -234,12 +291,31 @@ const LeaveHistoryScreen = ({ navigation }) => {
                 <Text style={styles.reasonText}>{leave.reason}</Text>
               </View>
 
-              {leave.status === "rejected" && leave.rejectionReason && (
+              {leave.finalStatus === "rejected" && (
                 <View style={styles.rejectionSection}>
                   <Icon name="alert-circle" size={16} color={COLORS.danger} />
                   <Text style={styles.rejectionText}>
-                    {leave.rejectionReason}
+                    {leave.rejectionReason || "No reason provided"}
                   </Text>
+                </View>
+              )}
+
+              {/* Approval Chain Info */}
+              {leave.approvals && leave.approvals.length > 0 && (
+                <View style={styles.approvalChain}>
+                  <Text style={styles.approvalTitle}>Approval Status:</Text>
+                  {leave.approvals.map((approval, idx) => (
+                    <View key={idx} style={styles.approvalItem}>
+                      <Icon
+                        name={approval.status === "approved" ? "check-circle" : "close-circle"}
+                        size={14}
+                        color={approval.status === "approved" ? COLORS.success : COLORS.danger}
+                      />
+                      <Text style={styles.approvalText}>
+                        {approval.level === 1 ? "Teacher" : "HOD"}: {approval.status}
+                      </Text>
+                    </View>
+                  ))}
                 </View>
               )}
 
@@ -263,18 +339,16 @@ const LeaveHistoryScreen = ({ navigation }) => {
                 </View>
               )}
 
-              {/* DELETE BUTTON */}
-              {(leave.status === "pending" ||
-                leave.status === "approved_by_teacher") &&
-                leave.finalStatus === "pending" && (
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() => handleDeletePress(leave._id)}
-                  >
-                    <Icon name="delete" size={16} color={COLORS.white} />
-                    <Text style={styles.deleteText}>Delete Request</Text>
-                  </TouchableOpacity>
-                )}
+              {/* DELETE BUTTON - Only for pending leaves */}
+              {leave.finalStatus === "pending" && (
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() => handleDeletePress(leave._id)}
+                >
+                  <Icon name="delete" size={16} color={COLORS.white} />
+                  <Text style={styles.deleteText}>Delete Request</Text>
+                </TouchableOpacity>
+              )}
 
               <Text style={styles.appliedDate}>
                 Applied on {new Date(leave.createdAt).toLocaleDateString()}
@@ -346,10 +420,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
-
+    backButton: {
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    },
   headerTitle: {
     color: COLORS.white,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "700",
   },
 
@@ -384,7 +462,33 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   },
 
-  content: { padding: 20 },
+  summaryContainer: {
+    flexDirection: "row",
+    backgroundColor: COLORS.white,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.grayLight,
+  },
+
+  summaryItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+
+  summaryLabel: {
+    fontSize: 11,
+    color: COLORS.slate,
+    marginBottom: 2,
+  },
+
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: COLORS.slateDark,
+  },
+
+  content: { padding: 20, flex: 1 },
 
   emptyState: {
     alignItems: "center",
@@ -508,6 +612,32 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     color: COLORS.danger,
+  },
+
+  approvalChain: {
+    marginBottom: 12,
+    padding: 10,
+    backgroundColor: COLORS.grayLight + "20",
+    borderRadius: 8,
+  },
+
+  approvalTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.slate,
+    marginBottom: 6,
+  },
+
+  approvalItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+  },
+
+  approvalText: {
+    fontSize: 12,
+    color: COLORS.slateDark,
   },
 
   attachmentsSection: { marginBottom: 12 },

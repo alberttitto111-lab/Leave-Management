@@ -1,3 +1,4 @@
+// screens/student/StudentDashboard.js
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
@@ -24,11 +25,12 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 
 const { width } = Dimensions.get("window");
 
-const StudentDashboard = ({ navigation }) => {
+const StudentDashboard = ({ navigation, route }) => { // Add route to props
   const { user, logout, token, refreshUserProfile } = useAuth();
   const [stats, setStats] = useState({
     pendingLeaves: 0,
     approvedLeaves: 0,
+    rejectedLeaves: 0,
     totalLeaves: 0,
     class: "N/A",
     section: "N/A",
@@ -50,6 +52,16 @@ const StudentDashboard = ({ navigation }) => {
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
 
+  // Handle navigation params to open modal
+  useEffect(() => {
+    // Check if we should open the leave modal from navigation params
+    if (route.params?.openLeaveModal) {
+      setModalVisible(true);
+      // Clear the param after opening
+      navigation.setParams({ openLeaveModal: undefined });
+    }
+  }, [route.params?.openLeaveModal]);
+
   // Listen for focus events to refresh profile data
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -64,10 +76,20 @@ const StudentDashboard = ({ navigation }) => {
     try {
       const response = await api.get("/student/dashboard-stats");
       const data = response.data.data || {};
+      
+      // Calculate rejected count (both teacher and HOD rejected)
+      const rejectedCount = (data.recentLeaves || []).filter(
+        leave => leave.finalStatus === "rejected"
+      ).length;
+      
+      // Calculate total leaves
+      const totalLeaves = (data.pendingLeaves || 0) + (data.approvedLeaves || 0) + rejectedCount;
+      
       setStats({
         pendingLeaves: data.pendingLeaves || 0,
         approvedLeaves: data.approvedLeaves || 0,
-        totalLeaves: (data.pendingLeaves || 0) + (data.approvedLeaves || 0),
+        rejectedLeaves: rejectedCount,
+        totalLeaves: totalLeaves,
         class: data.class || "N/A",
         section: data.section || "N/A",
         rollNumber: data.rollNumber || "N/A",
@@ -138,58 +160,62 @@ const StudentDashboard = ({ navigation }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmitLeave = async () => {
-    setErrors({});
+const handleSubmitLeave = async () => {
+  setErrors({});
 
-    if (!validateForm()) {
-      return;
-    }
+  if (!validateForm()) {
+    return;
+  }
 
-    setSubmitting(true);
-    
-    const selectedLeaveType = leaveTypes.find(t => t._id === formData.leaveTypeId);
-    
-    const optimisticLeave = {
-      leaveType: selectedLeaveType,
-      dateRange: {
-        from: formData.fromDate,
-        to: formData.toDate,
-        days: calculateDays(),
-      },
-      reason: formData.reason,
-      status: "pending",
-      finalStatus: "pending",
+  setSubmitting(true);
+  
+  const selectedLeaveType = leaveTypes.find(t => t._id === formData.leaveTypeId);
+  
+  // Create a temporary ID for optimistic update
+  const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  
+  const optimisticLeave = {
+    _id: tempId,
+    leaveType: selectedLeaveType,
+    dateRange: {
+      from: formData.fromDate,
+      to: formData.toDate,
+      days: calculateDays(),
+    },
+    reason: formData.reason,
+    status: "pending",
+    finalStatus: "pending",
+  };
+
+  // Optimistically update UI
+  setRecentLeaves(prev => [optimisticLeave, ...prev].slice(0, 5));
+  setStats(prev => ({
+    ...prev,
+    pendingLeaves: prev.pendingLeaves + 1,
+    totalLeaves: prev.totalLeaves + 1,
+  }));
+
+  setModalVisible(false);
+  resetForm();
+
+  try {
+    const payload = {
+      leaveTypeId: formData.leaveTypeId.toString(),
+      fromDate: formData.fromDate.toISOString(),
+      toDate: formData.toDate.toISOString(),
+      reason: formData.reason.trim(),
+      halfDay: formData.halfDay,
+      days: calculateDays(),
     };
 
-    // Optimistically update UI
-    setRecentLeaves(prev => [optimisticLeave, ...prev].slice(0, 5));
-    setStats(prev => ({
-      ...prev,
-      pendingLeaves: prev.pendingLeaves + 1,
-      totalLeaves: prev.totalLeaves + 1,
-    }));
-
-    setModalVisible(false);
-    resetForm();
-
-    try {
-      const payload = {
-        leaveTypeId: formData.leaveTypeId.toString(),
-        fromDate: formData.fromDate.toISOString(),
-        toDate: formData.toDate.toISOString(),
-        reason: formData.reason.trim(),
-        halfDay: formData.halfDay,
-        days: calculateDays(),
-      };
-
-      const response = await api.post("/student/leave-request", payload);
-      
-      if (response.data?.data) {
-        setRecentLeaves(prev => {
-          const filtered = prev.filter(l => !l._id?.startsWith('temp-'));
-          return [response.data.data, ...filtered].slice(0, 5);
-        });
-      }
+    const response = await api.post("/student/leave-request", payload);
+    
+    if (response.data?.data) {
+      // Replace the optimistic leave with the real one
+      setRecentLeaves(prev => {
+        const filtered = prev.filter(l => l._id !== tempId);
+        return [response.data.data, ...filtered].slice(0, 5);
+      });
 
       Alert.alert(
         "Success", 
@@ -197,15 +223,24 @@ const StudentDashboard = ({ navigation }) => {
         [{ text: "OK" }],
         { cancelable: true }
       );
-      
-    } catch (error) {
-      console.error("Submit error:", error);
-      fetchDashboardData(); // Refresh to correct state
-      Alert.alert("Error", error.response?.data?.message || "Failed to submit request");
-    } finally {
-      setSubmitting(false);
     }
-  };
+    
+  } catch (error) {
+    console.error("Submit error:", error);
+    // Remove the optimistic leave on error
+    setRecentLeaves(prev => prev.filter(l => l._id !== tempId));
+    // Revert stats on error
+    setStats(prev => ({
+      ...prev,
+      pendingLeaves: prev.pendingLeaves - 1,
+      totalLeaves: prev.totalLeaves - 1,
+    }));
+    fetchDashboardData(); // Refresh to correct state
+    Alert.alert("Error", error.response?.data?.message || "Failed to submit request");
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   const resetForm = () => {
     setFormData({
@@ -436,6 +471,7 @@ const StudentDashboard = ({ navigation }) => {
             <Text style={styles.statTitle}>Approved</Text>
           </TouchableOpacity>
 
+          {/* Total stat */}
           <TouchableOpacity
             style={[styles.statCard, { borderLeftColor: COLORS.primary }]}
           >
@@ -451,19 +487,20 @@ const StudentDashboard = ({ navigation }) => {
             <Text style={styles.statTitle}>Total</Text>
           </TouchableOpacity>
 
+          {/* Rejected stat */}
           <TouchableOpacity
-            style={[styles.statCard, { borderLeftColor: COLORS.info }]}
+            style={[styles.statCard, { borderLeftColor: COLORS.danger }]}
           >
             <View
               style={[
                 styles.iconContainer,
-                { backgroundColor: COLORS.info + "20" },
+                { backgroundColor: COLORS.danger + "20" },
               ]}
             >
-              <Icon name="card-account-details" size={24} color={COLORS.info} />
+              <Icon name="close-circle" size={24} color={COLORS.danger} />
             </View>
-            <Text style={styles.statValue}>{stats.rollNumber}</Text>
-            <Text style={styles.statTitle}>Roll No</Text>
+            <Text style={styles.statValue}>{stats.rejectedLeaves}</Text>
+            <Text style={styles.statTitle}>Rejected</Text>
           </TouchableOpacity>
         </View>
 
@@ -747,6 +784,7 @@ const StudentDashboard = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
+  // ... (styles remain exactly the same as in your original code)
   container: { flex: 1, backgroundColor: COLORS.background },
   header: { paddingTop: 40, paddingHorizontal: 20, paddingBottom: 80 },
   headerTop: {

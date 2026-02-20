@@ -44,6 +44,7 @@ import TeacherRejectedScreen from "../screens/teacher/TeacherRejectedScreen";
 import StudentDashboard from "../screens/student/StudentDashboard";
 import LeaveHistoryScreen from "../screens/student/LeaveHistoryScreen";
 import EditStudentProfileScreen from "../screens/student/EditStudentProfileScreen";
+import LeaveRequestScreen from "../screens/student/LeaveRequestScreen";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -90,43 +91,78 @@ const StudentTabs = () => (
     screenOptions={({ route }) => ({
       tabBarIcon: ({ focused, color, size }) => {
         let iconName;
-        if (route.name === "Home") iconName = focused ? "home" : "home-outline";
-        else if (route.name === "Apply")
-          iconName = focused ? "add-circle" : "add-circle-outline";
-        else if (route.name === "History")
+        if (route.name === "Home") {
+          iconName = focused ? "home" : "home-outline";
+        } 
+        // else if (route.name === "Apply Leave") {
+        //   iconName = focused ? "add-circle" : "add-circle-outline";
+        // } 
+        else if (route.name === "Leave History") {
           iconName = focused ? "time" : "time-outline";
-        else if (route.name === "Profile")
+        }
+        else if (route.name === "My Profile") {
           iconName = focused ? "person" : "person-outline";
+        }
+        // else if (route.name === "Profile")
+        //   iconName = focused ? "person" : "person-outline";
         return <Ionicons name={iconName} size={size} color={color} />;
       },
       tabBarActiveTintColor: "#2563EB",
       tabBarInactiveTintColor: "gray",
+      tabBarStyle: { height: 60, paddingBottom: 5, paddingTop: 5 },
     })}
   >
-    <Tab.Screen options={{ 
+     {/* Home Tab - Shows Student Dashboard */}
+    <Tab.Screen 
+      name="Home" 
+      component={StudentStackNavigator}
+      options={{
         headerShown: false,
         tabBarLabel: "Home",
       }}
-      name="Home" component={StudentStackNavigator} />
+    />
+
+    {/* Apply Leave Tab - Shows Leave Request Modal */}
+    {/* <Tab.Screen 
+      name="Apply Leave" 
+      component={StudentDashboard}
+      options={{
+        headerShown: false,
+        tabBarLabel: "Apply Leave",
+      }}
+      listeners={({ navigation }) => ({
+        tabPress: (e) => {
+          // Prevent default navigation
+          e.preventDefault();
+          // Navigate to StudentDashboard and open the leave modal
+          navigation.navigate('Home', {
+            screen: 'StudentHome',
+            params: { openLeaveModal: true }
+          });
+        },
+      })}
+    /> */}
 
     <Tab.Screen options={{ 
         headerShown: false,
-        tabBarLabel: "Apply",
+        tabBarLabel: "Leave History",
       }}
-      name="Apply" 
-      component={StudentDashboard} />
+      name="Leave History" component={LeaveHistoryScreen} />
 
-    <Tab.Screen options={{ 
+    {/* My Profile Tab - Shows Edit Profile Screen */}
+    <Tab.Screen 
+      name="My Profile" 
+      component={EditStudentProfileScreen}
+      options={{
         headerShown: false,
-        tabBarLabel: "History",
+        tabBarLabel: "My Profile",
       }}
-      name="History" component={LeaveHistoryScreen} />
-
-    <Tab.Screen options={{ 
+    />
+    {/* <Tab.Screen options={{ 
         headerShown: false,
         tabBarLabel: "Profile",
       }}
-    name="Profile" component={StudentDashboard} />
+    name="Profile" component={StudentDashboard} /> */}
   </Tab.Navigator>
 );
 
