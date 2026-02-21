@@ -10,15 +10,19 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { COLORS } from "../../utils/constants";
 
+const HEADER_HEIGHT = 100;
+
 const LeaveDetailsScreen = ({ route, navigation }) => {
   const { leaveId } = route.params;
   const [leave, setLeave] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [student, setStudent] = useState(null);
 
   useEffect(() => {
@@ -41,7 +45,13 @@ const LeaveDetailsScreen = ({ route, navigation }) => {
       Alert.alert("Error", "Failed to load leave details");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchLeaveDetails();
   };
 
   const getStatusColor = () => {
@@ -103,6 +113,7 @@ const LeaveDetailsScreen = ({ route, navigation }) => {
 
   const studentInfo = student?.personalInfo || {};
   const academicInfo = student?.academicInfo || {};
+  const department = student?.departmentId || {};
   const approvalChain = getApprovalChain();
   const isFinalized = leave.finalStatus === "approved" || leave.finalStatus === "rejected";
 
@@ -110,16 +121,41 @@ const LeaveDetailsScreen = ({ route, navigation }) => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
 
-      {/* Header */}
+      {/* Fixed Header */}
       <View style={[styles.header, { backgroundColor: COLORS.primary }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Leave Details</Text>
-        <View style={{ width: 40 }} />
+        <View style={styles.headerTop}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>Leave Details</Text>
+            <Text style={styles.headerSubtitle}>
+              {leave.requestId || ""}
+            </Text>
+          </View>
+          <View style={{ width: 40 }} />
+        </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      {/* Scroll Area */}
+      <ScrollView
+        style={StyleSheet.absoluteFill}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={true}
+        persistentScrollbar={true}
+        indicatorStyle="black"
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            colors={[COLORS.primary]}
+            tintColor={COLORS.primary}
+          />
+        }
+      >
+        {/* Spacer for fixed header */}
+        <View style={{ height: HEADER_HEIGHT + 10 }} />
+
         {/* Status Stamp */}
         {isFinalized && (
           <View style={[
@@ -152,7 +188,7 @@ const LeaveDetailsScreen = ({ route, navigation }) => {
           </View>
 
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Class:</Text>
+            <Text style={styles.infoLabel}>Class - Section:</Text>
             <Text style={styles.infoValue}>
               {academicInfo.class || "N/A"} - {academicInfo.section || "N/A"}
             </Text>
@@ -166,6 +202,11 @@ const LeaveDetailsScreen = ({ route, navigation }) => {
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>User ID:</Text>
             <Text style={styles.infoValue}>{student?.userId || "N/A"}</Text>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Department:</Text>
+            <Text style={styles.infoValue}>{department.name || "N/A"}</Text>
           </View>
 
           <View style={styles.infoRow}>
@@ -310,6 +351,7 @@ const LeaveDetailsScreen = ({ route, navigation }) => {
           Applied on: {new Date(leave.createdAt).toLocaleString()}
         </Text>
 
+        {/* Bottom padding for comfortable scrolling */}
         <View style={{ height: 40 }} />
       </ScrollView>
     </View>
@@ -337,27 +379,53 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.danger,
   },
+  // Header styles - fixed position
   header: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: HEADER_HEIGHT,
+    paddingTop: Platform.OS === "ios" ? 50 : 30,
+    zIndex: 10,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  headerTop: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingTop: Platform.OS === "ios" ? 60 : 40,
     paddingHorizontal: 20,
-    paddingBottom: 20,
   },
   backButton: {
     padding: 8,
     borderRadius: 12,
     backgroundColor: "rgba(255,255,255,0.2)",
   },
+  headerTitleContainer: {
+    alignItems: "center",
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: "bold",
     color: COLORS.white,
   },
-  content: {
-    flex: 1,
-    padding: 20,
+  headerSubtitle: {
+    fontSize: 12,
+    color: "#fff",
+    opacity: 0.8,
+    marginTop: 2,
+  },
+  // Scroll content
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    flexGrow: 1,
   },
   // Stamp styles
   stampContainer: {
