@@ -17,6 +17,8 @@ import teacherRoutes from "./routes/teacher.js";
 import hodRoutes from "./routes/hod.js";
 import studentRoutes from "./routes/student.js";
 
+import emailRoutes from './routes/email.js'; // Import email routes
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -78,6 +80,12 @@ app.use(
   express.static(path.join(__dirname, "uploads")),
 );
 
+// Add this before your routes
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`, req.body);
+  next();
+});
+
 /* ---------------- ROUTES ---------------- */
 // ... (routes stay the same)
 app.use("/api/auth", authRoutes);
@@ -86,6 +94,20 @@ app.use("/api/student", studentRoutes);
 app.use("/api/teacher", teacherRoutes);
 app.use("/api/hod", hodRoutes);
 app.use("/uploads/letters", express.static("uploads/letters"));
+
+// Email routes
+app.use('/api/email', emailRoutes);
+
+// Add after your routes
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({
+    success: false,
+    message: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
+});
+
 /* ---------------- FALLBACK & ERROR ---------------- */
 
 app.use((req, res) => {

@@ -1,5 +1,5 @@
 // API Configuration
-export const API_BASE_URL = "http://192.168.220.33:5000/api"; // Change to your backend URL
+export const API_BASE_URL = "http://192.168.220.34:5000/api"; // Change to your backend URL
 export const API_TIMEOUT = 30000;
 
 // Storage Keys
