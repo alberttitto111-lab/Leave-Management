@@ -13,11 +13,15 @@ import {
   Alert,
   ScrollView,
   Switch,
+  StatusBar,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { useFocusEffect } from "@react-navigation/native";
 import { COLORS } from "../../utils/constants";
+
+const HEADER_HEIGHT = 100;
 
 const LeaveTypeItem = ({ leaveType, onPress, onDelete }) => (
   <View style={styles.leaveTypeItem}>
@@ -330,7 +334,7 @@ const LeaveTypesManagementScreen = ({ navigation }) => {
 
       <Text style={styles.formLabel}>Applicable To</Text>
       <View style={styles.applicableContainer}>
-        {["all", "student", "teacher", "staff"].map((type) => (
+        {["student"].map((type) => (
           <TouchableOpacity
             key={type}
             style={[
@@ -419,62 +423,80 @@ const LeaveTypesManagementScreen = ({ navigation }) => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Updated Header with Blue Background */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-        
-        <Text style={styles.headerTitle}>Leave Types</Text>
-        
-        <TouchableOpacity onPress={handleAddPress}>
-          <Ionicons name="add-circle" size={28} color="#FFFFFF" />
-        </TouchableOpacity>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#7C3AED" />
+
+      {/* Fixed Header */}
+      <View style={[styles.header, { backgroundColor: "#7C3AED" }]}>
+        <View style={styles.headerTop}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>Leave Types</Text>
+            <Text style={styles.headerSubtitle}>
+              {leaveTypes.length} type{leaveTypes.length !== 1 ? 's' : ''}
+            </Text>
+          </View>
+          
+          <TouchableOpacity onPress={handleAddPress} style={styles.addButton}>
+            <Ionicons name="add" size={28} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Main ScrollView - Fixed scrolling issue */}
-      <View style={styles.scrollViewContainer}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          showsVerticalScrollIndicator={true}
-          bounces={true}
-          alwaysBounceVertical={true}
-        >
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#2563EB" />
-              <Text style={styles.loadingText}>Loading leave types...</Text>
-            </View>
-          ) : leaveTypes.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="calendar-outline" size={64} color="#CBD5E1" />
-              <Text style={styles.emptyText}>No leave types found</Text>
-              <TouchableOpacity
-                style={styles.addFirstButton}
-                onPress={handleAddPress}
-              >
-                <Text style={styles.addFirstButtonText}>
-                  Add First Leave Type
-                </Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            leaveTypes.map((item) => (
-              <LeaveTypeItem
-                key={item._id}
-                leaveType={item}
-                onPress={handleEditPress}
-                onDelete={handleDeletePress}
-              />
-            ))
-          )}
-          <View style={styles.bottomPadding} />
-        </ScrollView>
-      </View>
+      {/* Scroll Area */}
+      <ScrollView
+        style={StyleSheet.absoluteFill}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={true}
+        persistentScrollbar={true}
+        indicatorStyle="black"
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            colors={["#7C3AED"]}
+            tintColor="#7C3AED"
+          />
+        }
+      >
+        {/* Spacer for fixed header */}
+        <View style={{ height: HEADER_HEIGHT + 10 }} />
+
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#7C3AED" />
+            <Text style={styles.loadingText}>Loading leave types...</Text>
+          </View>
+        ) : leaveTypes.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="calendar-outline" size={64} color="#CBD5E1" />
+            <Text style={styles.emptyText}>No leave types found</Text>
+            <TouchableOpacity
+              style={styles.addFirstButton}
+              onPress={handleAddPress}
+            >
+              <Text style={styles.addFirstButtonText}>
+                Add First Leave Type
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          leaveTypes.map((item) => (
+            <LeaveTypeItem
+              key={item._id}
+              leaveType={item}
+              onPress={handleEditPress}
+              onDelete={handleDeletePress}
+            />
+          ))
+        )}
+        
+        {/* Bottom padding for comfortable scrolling */}
+        <View style={{ height: 40 }} />
+      </ScrollView>
 
       {/* Add/Edit Modal */}
       <Modal
@@ -493,7 +515,7 @@ const LeaveTypesManagementScreen = ({ navigation }) => {
                 resetForm();
               }}
             >
-              <Ionicons name="close" size={24} color={COLORS.slateDark} />
+              <Ionicons name="close" size={24} color={COLORS.white} />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>
               {editingLeaveType ? "Edit Leave Type" : "Add Leave Type"}
@@ -539,55 +561,77 @@ const LeaveTypesManagementScreen = ({ navigation }) => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#ede9f3",
   },
+  // Fixed Header styles
   header: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: HEADER_HEIGHT,
+    paddingTop: Platform.OS === "ios" ? 50 : 30,
+    zIndex: 10,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    elevation: 4,
+    shadowColor: "#6a00ff",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+  },
+  headerTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: "#7C3AED",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5f0e2",
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  headerTitleContainer: {
+    alignItems: "center",
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
+    fontSize: 20,
+    fontWeight: "bold",
     color: "#FFFFFF",
   },
-  // New container for ScrollView to ensure proper sizing
-  scrollViewContainer: {
-    flex: 1,
+  headerSubtitle: {
+    fontSize: 12,
+    color: "#FFFFFF",
+    opacity: 0.8,
+    marginTop: 2,
   },
-  scrollView: {
-    flex: 1,
+  addButton: {
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
+  // Scroll content
   scrollContent: {
-    padding: 16,
+    paddingHorizontal: 16,
     paddingBottom: 20,
-    flexGrow: 1, // Ensures content can grow
+    flexGrow: 1,
   },
   loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
     alignItems: "center",
-    minHeight: 200, // Ensures loading container has height
+    justifyContent: "center",
+    paddingVertical: 60,
   },
   loadingText: {
     marginTop: 12,
     fontSize: 14,
     color: "#64748B",
-  },
-  bottomPadding: {
-    height: 20,
   },
   leaveTypeItem: {
     flexDirection: "row",
@@ -693,8 +737,7 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
-    paddingTop: 100,
-    minHeight: 300, // Ensures empty state has height
+    paddingVertical: 60,
   },
   emptyText: {
     color: "#94A3B8",
@@ -703,7 +746,7 @@ const styles = StyleSheet.create({
   },
   addFirstButton: {
     marginTop: 20,
-    backgroundColor: "#2563EB",
+    backgroundColor: "#7C3AED",
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
@@ -716,7 +759,7 @@ const styles = StyleSheet.create({
   // Modal styles
   modalContainer: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#f4f0f7",
   },
   modalHeader: {
     flexDirection: "row",
@@ -724,14 +767,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: "#fff",
+    backgroundColor: "#7C3AED",
     borderBottomWidth: 1,
     borderBottomColor: "#E2E8F0",
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#1E293B",
+    color: "#ffffff",
   },
   formContainer: {
     padding: 20,
@@ -739,7 +782,7 @@ const styles = StyleSheet.create({
   formLabel: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#475569",
+    color: "#373e49",
     marginBottom: 8,
     marginTop: 16,
   },
@@ -749,9 +792,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
-    color: "#1E293B",
+    color: "#66686a",
     borderWidth: 1,
     borderColor: "#E2E8F0",
+    outlineColor: "#ffffff", // Remove default focus outline
   },
   colorContainer: {
     flexDirection: "row",
@@ -765,21 +809,21 @@ const styles = StyleSheet.create({
   },
   colorOptionSelected: {
     borderWidth: 3,
-    borderColor: "#1E293B",
+    borderColor: "#474747",
   },
   applicableOption: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: "#e3e3e3",
+    backgroundColor: "#a6a6a6",
     marginRight: 8,
     marginBottom: 8,
   },
-  applicableOptionSelected: {
-    backgroundColor: "#7f4bd7",
+  applicableOptionSelected: { 
+    backgroundColor: "#7C3AED",
   },
   applicableOptionText: {
-    color: "#64748B",
+    color: "#000000",
     fontWeight: "500",
   },
   applicableOptionTextSelected: {
@@ -794,7 +838,7 @@ const styles = StyleSheet.create({
   },
   switchLabel: {
     fontSize: 16,
-    color: "#475569",
+    color: "#000000",
   },
   formButtons: {
     flexDirection: "row",

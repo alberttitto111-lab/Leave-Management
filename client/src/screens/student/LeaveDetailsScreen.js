@@ -620,7 +620,7 @@ const testEmail = async () => {
               <Ionicons name="notifications-outline" size={20} color="#fff" />
               <Text style={styles.notifyButtonText}>Notify</Text>
             </TouchableOpacity> */}
-            <TouchableOpacity 
+            {/* <TouchableOpacity 
   onPress={handleNotify} 
   style={styles.notifyButton}
   disabled={sending}
@@ -633,7 +633,7 @@ const testEmail = async () => {
       <Text style={styles.notifyButtonText}>Notify</Text>
     </>
   )}
-</TouchableOpacity>
+</TouchableOpacity> */}
 
 {/* Add this temporarily next to your other buttons */}
 <TouchableOpacity 
@@ -641,8 +641,8 @@ const testEmail = async () => {
   style={styles.notifyButton}
   disabled={sending}
 >
-  <Ionicons name="bug" size={20} color="#fff" />
-  <Text style={styles.notifyButtonText}>Test</Text>
+  <Ionicons name="mail-outline" size={20} color="#fff" />
+  <Text style={styles.notifyButtonText}>Send to Mail</Text>
 </TouchableOpacity>
 
             <TouchableOpacity 
@@ -654,8 +654,8 @@ const testEmail = async () => {
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
-                  <Ionicons name="send" size={20} color="#fff" />
-                  <Text style={styles.sendButtonText}>Send</Text>
+                  <Ionicons name="share-outline" size={20} color="#fff" />
+                  <Text style={styles.sendButtonText}>Share</Text>
                 </>
               )}
             </TouchableOpacity>

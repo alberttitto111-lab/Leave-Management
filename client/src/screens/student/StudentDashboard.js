@@ -32,14 +32,19 @@ const StudentDashboard = ({ navigation, route }) => {
     approvedLeaves: 0,
     rejectedLeaves: 0,
     totalLeaves: 0,
+  });
+  const [studentInfo, setStudentInfo] = useState({
     class: "N/A",
     section: "N/A",
     rollNumber: "N/A",
+    firstName: "",
+    lastName: "",
   });
   const [recentLeaves, setRecentLeaves] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [leaveTypes, setLeaveTypes] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Leave Request Form State
   const [formData, setFormData] = useState({
@@ -64,35 +69,69 @@ const StudentDashboard = ({ navigation, route }) => {
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       refreshUserProfile();
+      fetchStudentProfile();
       fetchDashboardData();
     });
 
     return unsubscribe;
   }, [navigation]);
 
-  const fetchDashboardData = useCallback(async () => {
+  // Fetch student profile for real-time updates
+  const fetchStudentProfile = useCallback(async () => {
     try {
-      const response = await api.get("/student/dashboard-stats");
+      const response = await api.get("/student/profile");
       const data = response.data.data || {};
       
-      const rejectedCount = (data.recentLeaves || []).filter(
-        leave => leave.finalStatus === "rejected"
+      const personalInfo = data.personalInfo || {};
+      const academicInfo = data.academicInfo || {};
+      
+      setStudentInfo({
+        class: academicInfo.class || "N/A",
+        section: academicInfo.section || "N/A",
+        rollNumber: academicInfo.rollNumber || "N/A",
+        firstName: personalInfo.firstName || "",
+        lastName: personalInfo.lastName || "",
+      });
+    } catch (error) {
+      console.error("Error fetching student profile:", error);
+    }
+  }, []);
+
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      const response = await api.get("/student/leave-history");
+      const leaves = response.data.data || [];
+      
+      // Calculate stats exactly like in LeaveHistory page
+      const pendingCount = leaves.filter(leave => 
+        leave.finalStatus === "pending" && 
+        (leave.status === "pending" || leave.status === "approved_by_teacher")
       ).length;
       
-      const totalLeaves = (data.pendingLeaves || 0) + (data.approvedLeaves || 0) + rejectedCount;
+      const approvedCount = leaves.filter(leave => 
+        leave.finalStatus === "approved" || 
+        leave.status === "approved_by_hod"
+      ).length;
+      
+      const rejectedCount = leaves.filter(leave => 
+        leave.finalStatus === "rejected"
+      ).length;
+      
+      const totalCount = leaves.length;
       
       setStats({
-        pendingLeaves: data.pendingLeaves || 0,
-        approvedLeaves: data.approvedLeaves || 0,
+        pendingLeaves: pendingCount,
+        approvedLeaves: approvedCount,
         rejectedLeaves: rejectedCount,
-        totalLeaves: totalLeaves,
-        class: data.class || "N/A",
-        section: data.section || "N/A",
-        rollNumber: data.rollNumber || "N/A",
+        totalLeaves: totalCount,
       });
-      setRecentLeaves(data.recentLeaves || []);
+      
+      // Set recent leaves (last 3 requests)
+      setRecentLeaves(leaves.slice(0, 3));
     } catch (error) {
       console.error("Dashboard fetch error:", error);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -108,14 +147,24 @@ const StudentDashboard = ({ navigation, route }) => {
   }, []);
 
   useEffect(() => {
-    fetchDashboardData();
-    fetchLeaveTypes();
+    const loadInitialData = async () => {
+      setLoading(true);
+      await Promise.all([
+        fetchStudentProfile(),
+        fetchDashboardData(),
+        fetchLeaveTypes()
+      ]);
+      setLoading(false);
+    };
+    
+    loadInitialData();
   }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await Promise.all([
       refreshUserProfile(),
+      fetchStudentProfile(),
       fetchDashboardData(),
       fetchLeaveTypes()
     ]);
@@ -205,28 +254,23 @@ const StudentDashboard = ({ navigation, route }) => {
       const response = await api.post("/student/leave-request", payload);
       
       if (response.data?.data) {
-        setRecentLeaves(prev => {
-          const filtered = prev.filter(l => l._id !== tempId);
-          return [response.data.data, ...filtered].slice(0, 5);
-        });
-
-        Alert.alert(
-          "Success", 
-          "Leave request submitted successfully",
-          [{ text: "OK" }],
-          { cancelable: true }
-        );
+        // Refresh all data to ensure consistency
+        await Promise.all([
+          fetchDashboardData(),
+          fetchStudentProfile() // Also refresh profile in case anything changed
+        ]);
       }
+
+      Alert.alert(
+        "Success", 
+        "Leave request submitted successfully",
+        [{ text: "OK" }],
+        { cancelable: true }
+      );
       
     } catch (error) {
       console.error("Submit error:", error);
-      setRecentLeaves(prev => prev.filter(l => l._id !== tempId));
-      setStats(prev => ({
-        ...prev,
-        pendingLeaves: prev.pendingLeaves - 1,
-        totalLeaves: prev.totalLeaves - 1,
-      }));
-      fetchDashboardData();
+      await fetchDashboardData(); // Refresh to correct state
       Alert.alert("Error", error.response?.data?.message || "Failed to submit request");
     } finally {
       setSubmitting(false);
@@ -311,13 +355,18 @@ const StudentDashboard = ({ navigation, route }) => {
     },
   ];
 
+  // Get user's full name from context or studentInfo
   const getFullName = () => {
+    if (studentInfo.firstName || studentInfo.lastName) {
+      return `${studentInfo.firstName || ""} ${studentInfo.lastName || ""}`.trim();
+    }
     if (user?.personalInfo) {
       return `${user.personalInfo.firstName || ""} ${user.personalInfo.lastName || ""}`.trim();
     }
     return "Student";
   };
 
+  // Date Picker Component
   const DatePickerField = ({ label, date, onChange, error }) => {
     const [showPicker, setShowPicker] = useState(false);
 
@@ -376,6 +425,15 @@ const StudentDashboard = ({ navigation, route }) => {
     return String(id);
   };
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Loading dashboard...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
@@ -388,9 +446,11 @@ const StudentDashboard = ({ navigation, route }) => {
             <Text style={styles.userName}>
               {getFullName()}
             </Text>
+            {/* Class Badge - Now updates in real-time from database */}
             <View style={styles.classBadge}>
+              <Icon name="school-outline" size={14} color={COLORS.white} />
               <Text style={styles.classText}>
-                Class {stats.class}-{stats.section} | Roll: {stats.rollNumber}
+                Class {studentInfo.class}-{studentInfo.section} | Roll: {studentInfo.rollNumber}
               </Text>
             </View>
           </View>
@@ -407,27 +467,12 @@ const StudentDashboard = ({ navigation, route }) => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* Quick Actions */}
-        <View style={styles.quickActionsContainer}>
-          {quickActions.map((action, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.quickActionButton,
-                { backgroundColor: action.color },
-              ]}
-              onPress={action.action}
-            >
-              <Icon name={action.icon} size={24} color={COLORS.white} />
-              <Text style={styles.quickActionText}>{action.title}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
 
         {/* Stats Grid */}
         <View style={styles.statsContainer}>
           <TouchableOpacity
             style={[styles.statCard, { borderLeftColor: COLORS.warning }]}
+            onPress={() => navigation.navigate("LeaveHistory", { filter: "pending" })}
           >
             <View
               style={[
@@ -443,6 +488,7 @@ const StudentDashboard = ({ navigation, route }) => {
 
           <TouchableOpacity
             style={[styles.statCard, { borderLeftColor: COLORS.success }]}
+            onPress={() => navigation.navigate("LeaveHistory", { filter: "approved" })}
           >
             <View
               style={[
@@ -462,6 +508,7 @@ const StudentDashboard = ({ navigation, route }) => {
 
           <TouchableOpacity
             style={[styles.statCard, { borderLeftColor: COLORS.primary }]}
+            onPress={() => navigation.navigate("LeaveHistory")}
           >
             <View
               style={[
@@ -477,6 +524,7 @@ const StudentDashboard = ({ navigation, route }) => {
 
           <TouchableOpacity
             style={[styles.statCard, { borderLeftColor: COLORS.danger }]}
+            onPress={() => navigation.navigate("LeaveHistory", { filter: "rejected" })}
           >
             <View
               style={[
@@ -489,6 +537,23 @@ const StudentDashboard = ({ navigation, route }) => {
             <Text style={styles.statValue}>{stats.rejectedLeaves}</Text>
             <Text style={styles.statTitle}>Rejected</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Quick Actions */}
+        <View style={styles.quickActionsContainer}>
+          {quickActions.map((action, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.quickActionButton,
+                { backgroundColor: action.color },
+              ]}
+              onPress={action.action}
+            >
+              <Icon name={action.icon} size={24} color={COLORS.white} />
+              <Text style={styles.quickActionText}>{action.title}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         {/* Recent Leaves with Download and View Form Buttons */}
@@ -516,7 +581,7 @@ const StudentDashboard = ({ navigation, route }) => {
               </View>
             ) : (
               recentLeaves.map((leave, index) => (
-                <View key={index} style={styles.leaveItem}>
+                <View key={leave._id || index} style={styles.leaveItem}>
                   <View style={styles.leaveMain}>
                     <View
                       style={[
@@ -545,11 +610,11 @@ const StudentDashboard = ({ navigation, route }) => {
                         {leave.leaveType?.name}
                       </Text>
                       <Text style={styles.leaveDates}>
-                        {new Date(leave.dateRange?.from).toLocaleDateString()} -{" "}
-                        {new Date(leave.dateRange?.to).toLocaleDateString()}
+                        {leave.dateRange?.from ? new Date(leave.dateRange.from).toLocaleDateString() : "N/A"} -{" "}
+                        {leave.dateRange?.to ? new Date(leave.dateRange.to).toLocaleDateString() : "N/A"}
                       </Text>
                       <Text style={styles.leaveDays}>
-                        {leave.dateRange?.days} day(s)
+                        {leave.dateRange?.days || 0} day(s)
                       </Text>
                     </View>
                     <View
@@ -590,7 +655,7 @@ const StudentDashboard = ({ navigation, route }) => {
                         <Text style={styles.viewFormText}>View Form</Text>
                       </TouchableOpacity>
 
-                      <TouchableOpacity
+                      {/* <TouchableOpacity
                         style={styles.downloadButton}
                         onPress={() => downloadLetter(leave._id)}
                       >
@@ -598,7 +663,7 @@ const StudentDashboard = ({ navigation, route }) => {
                         <Text style={styles.downloadText}>
                           Download {leave.finalStatus === "approved" ? "Approval" : "Rejection"} Letter
                         </Text>
-                      </TouchableOpacity>
+                      </TouchableOpacity> */}
                     </View>
                   )}
                 </View>
@@ -609,177 +674,219 @@ const StudentDashboard = ({ navigation, route }) => {
       </ScrollView>
 
       {/* Modal for New Leave Request */}
-      {modalVisible && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>New Leave Request</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Icon name="close" size={24} color={COLORS.slateDark} />
-              </TouchableOpacity>
-            </View>
+{modalVisible && (
+  <View style={styles.modalOverlay}>
+    <View style={[styles.modalContent, { backgroundColor: "#e9eef0" }]}>
+       <View style={styles.modalHeader}>
+        <Text style={[styles.modalTitle]}>New Leave Request</Text>
+        <TouchableOpacity onPress={() => setModalVisible(false)}>
+          <Icon name="close" size={24} color={COLORS.slateDark} />
+        </TouchableOpacity>
+      </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.inputLabel}>Leave Type *</Text>
-              <View style={styles.leaveTypeContainer}>
-                {leaveTypes.length === 0 ? (
-                  <View style={styles.noTypesContainer}>
-                    <Icon
-                      name="alert-circle"
-                      size={24}
-                      color={COLORS.warning}
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <Text style={styles.inputLabel}>Leave Type *</Text>
+        <View style={styles.leaveTypeContainer}>
+          {leaveTypes.length === 0 ? (
+            <View style={styles.noTypesContainer}>
+              <Icon
+                name="alert-circle"
+                size={24}
+                color={COLORS.warning}
+              />
+              <Text style={styles.noTypesText}>
+                No leave types available
+              </Text>
+            </View>
+          ) : (
+            leaveTypes.map((type) => {
+              const typeId = getStringId(type._id);
+              const isSelected = formData.leaveTypeId === typeId;
+
+              return (
+                <TouchableOpacity
+                  key={typeId}
+                  style={[
+                    styles.leaveTypeButton,
+                    isSelected && styles.leaveTypeButtonActive,
+                    errors.leaveType && !isSelected && styles.inputError,
+                  ]}
+                  onPress={() => {
+                    setFormData({ ...formData, leaveTypeId: typeId });
+                    setErrors({ ...errors, leaveType: null });
+                  }}
+                >
+                  <View style={styles.leaveTypeContent}>
+                    <View
+                      style={[
+                        styles.colorDot,
+                        { backgroundColor: type.color || COLORS.primary },
+                      ]}
                     />
-                    <Text style={styles.noTypesText}>
-                      No leave types available
+                    <Text
+                      style={[
+                        styles.leaveTypeText,
+                        isSelected && styles.leaveTypeTextActive,
+                      ]}
+                    >
+                      {type.name}
                     </Text>
                   </View>
-                ) : (
-                  leaveTypes.map((type) => {
-                    const typeId = getStringId(type._id);
-                    const isSelected = formData.leaveTypeId === typeId;
+                  {type.maxDaysPerYear > 0 && (
+                    <Text
+                      style={[
+                        styles.leaveTypeSubtext,
+                        isSelected && styles.leaveTypeTextActive,
+                      ]}
+                    >
+                      Max: {type.maxDaysPerYear}/year
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </View>
+        {errors.leaveType && (
+          <Text style={styles.errorText}>{errors.leaveType}</Text>
+        )}
 
-                    return (
-                      <TouchableOpacity
-                        key={typeId}
-                        style={[
-                          styles.leaveTypeButton,
-                          isSelected && styles.leaveTypeButtonActive,
-                          errors.leaveType && !isSelected && styles.inputError,
-                        ]}
-                        onPress={() => {
-                          setFormData({ ...formData, leaveTypeId: typeId });
-                          setErrors({ ...errors, leaveType: null });
-                        }}
-                      >
-                        <View style={styles.leaveTypeContent}>
-                          <View
-                            style={[
-                              styles.colorDot,
-                              { backgroundColor: type.color || COLORS.primary },
-                            ]}
-                          />
-                          <Text
-                            style={[
-                              styles.leaveTypeText,
-                              isSelected && styles.leaveTypeTextActive,
-                            ]}
-                          >
-                            {type.name}
-                          </Text>
-                        </View>
-                        {type.maxDaysPerYear > 0 && (
-                          <Text
-                            style={[
-                              styles.leaveTypeSubtext,
-                              isSelected && styles.leaveTypeTextActive,
-                            ]}
-                          >
-                            Max: {type.maxDaysPerYear}/year
-                          </Text>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })
-                )}
-              </View>
-              {errors.leaveType && (
-                <Text style={styles.errorText}>{errors.leaveType}</Text>
-              )}
+        <View style={styles.dateContainer}>
+          <DatePickerField
+            label="From Date"
+            date={formData.fromDate}
+            onChange={(date) => {
+              setFormData({ ...formData, fromDate: date });
+              setErrors({ ...errors, dates: null });
+            }}
+            error={errors.dates}
+          />
+          <DatePickerField
+            label="To Date"
+            date={formData.toDate}
+            onChange={(date) => {
+              setFormData({ ...formData, toDate: date });
+              setErrors({ ...errors, dates: null });
+            }}
+            error={errors.dates}
+          />
+        </View>
 
-              <View style={styles.dateContainer}>
-                <DatePickerField
-                  label="From Date"
-                  date={formData.fromDate}
-                  onChange={(date) => {
-                    setFormData({ ...formData, fromDate: date });
-                    setErrors({ ...errors, dates: null });
-                  }}
-                  error={errors.dates}
+        {/* Half Day Leave Button - Styled like leave type buttons */}
+        <View style={styles.halfDaySection}>
+          <Text style={styles.inputLabel}>Leave Duration</Text>
+          <View style={styles.halfDayContainer}>
+            <TouchableOpacity
+              style={[
+                styles.halfDayButton,
+                formData.halfDay && styles.halfDayButtonActive,
+              ]}
+              onPress={() => setFormData({ ...formData, halfDay: !formData.halfDay })}
+            >
+              <View style={styles.halfDayContent}>
+                <Icon 
+                  name={formData.halfDay ? "checkbox-marked" : "checkbox-blank-outline"} 
+                  size={20} 
+                  color={formData.halfDay ? COLORS.white : COLORS.slateDark} 
                 />
-                <DatePickerField
-                  label="To Date"
-                  date={formData.toDate}
-                  onChange={(date) => {
-                    setFormData({ ...formData, toDate: date });
-                    setErrors({ ...errors, dates: null });
-                  }}
-                  error={errors.dates}
-                />
-              </View>
-
-              <TouchableOpacity
-                style={styles.halfDayContainer}
-                onPress={() =>
-                  setFormData({ ...formData, halfDay: !formData.halfDay })
-                }
-              >
-                <View
+                <Text
                   style={[
-                    styles.checkbox,
-                    formData.halfDay && styles.checkboxActive,
+                    styles.halfDayButtonText,
+                    formData.halfDay && styles.halfDayButtonTextActive,
                   ]}
                 >
-                  {formData.halfDay && (
-                    <Icon name="check" size={16} color={COLORS.white} />
-                  )}
-                </View>
-                <Text style={styles.halfDayText}>Half Day Leave</Text>
-              </TouchableOpacity>
-
-              <View style={styles.daysCalculation}>
-                <Text style={styles.daysLabel}>Total Days:</Text>
-                <Text style={styles.daysValue}>{calculateDays()}</Text>
+                  Half Day Leave
+                </Text>
               </View>
-
-              <Text style={styles.inputLabel}>Reason *</Text>
-              <TextInput
-                style={[
-                  styles.reasonInput,
-                  errors.reason && { borderColor: COLORS.danger },
-                ]}
-                multiline
-                numberOfLines={4}
-                placeholder="Enter reason for leave..."
-                value={formData.reason}
-                onChangeText={(text) => {
-                  setFormData({ ...formData, reason: text });
-                  setErrors({ ...errors, reason: null });
-                }}
-              />
-              {errors.reason && (
-                <Text style={styles.errorText}>{errors.reason}</Text>
+              {formData.halfDay && (
+                <View style={styles.halfDayBadge}>
+                  <Text style={styles.halfDayBadgeText}>0.5 day</Text>
+                </View>
               )}
-
-              <TouchableOpacity
-                style={[
-                  styles.submitButton,
-                  (submitting ||
-                    calculateDays() === 0 ||
-                    !formData.leaveTypeId) &&
-                    styles.submitButtonDisabled,
-                ]}
-                onPress={handleSubmitLeave}
-                disabled={
-                  submitting || calculateDays() === 0 || !formData.leaveTypeId
-                }
-              >
-                {submitting ? (
-                  <ActivityIndicator color={COLORS.white} />
-                ) : (
-                  <Text style={styles.submitButtonText}>Submit Request</Text>
-                )}
-              </TouchableOpacity>
-            </ScrollView>
+            </TouchableOpacity>
           </View>
         </View>
-      )}
+
+        {/* Days Calculation */}
+        <View style={styles.daysCalculation}>
+          <Text style={styles.daysLabel}>Total Days:</Text>
+          <Text style={styles.daysValue}>{calculateDays()}</Text>
+        </View>
+
+        <Text style={styles.inputLabel}>Reason *</Text>
+        <TextInput
+          style={[
+            styles.reasonInput,
+            errors.reason && { borderColor: COLORS.danger },
+          ]}
+          multiline
+          numberOfLines={4}
+          placeholder="Enter reason for leave..."
+          value={formData.reason}
+          onChangeText={(text) => {
+            setFormData({ ...formData, reason: text });
+            setErrors({ ...errors, reason: null });
+          }}
+        />
+        {errors.reason && (
+          <Text style={styles.errorText}>{errors.reason}</Text>
+        )}
+
+        <TouchableOpacity
+          style={[
+            styles.submitButton,
+            (submitting ||
+              calculateDays() === 0 ||
+              !formData.leaveTypeId) &&
+              styles.submitButtonDisabled,
+          ]}
+          onPress={handleSubmitLeave}
+          disabled={
+            submitting || calculateDays() === 0 || !formData.leaveTypeId
+          }
+        >
+          {submitting ? (
+            <ActivityIndicator color={COLORS.white} />
+          ) : (
+            <Text style={styles.submitButtonText}>Submit Request</Text>
+          )}
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
+  </View>
+)}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  header: { paddingTop: 40, paddingHorizontal: 20, paddingBottom: 80 },
+  container: {
+    flex: 1, 
+    backgroundColor: "#e4ebf0", 
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: COLORS.background,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: COLORS.slate,
+  },
+  header: { 
+    paddingTop: 40, 
+    paddingHorizontal: 30, 
+    paddingBottom: 30,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30, 
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
   headerTop: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -793,12 +900,15 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   classBadge: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.2)",
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderRadius: 20,
     marginTop: 8,
     alignSelf: "flex-start",
+    gap: 6,
   },
   classText: {
     color: COLORS.white,
@@ -806,11 +916,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   logoutButton: {
+    marginTop: 30,
     padding: 8,
     borderRadius: 12,
     backgroundColor: "rgba(255,255,255,0.2)",
   },
-  content: { flex: 1, marginTop: -60 },
+  content: { flex: 1, marginTop: 0 },
   quickActionsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -843,6 +954,7 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     paddingHorizontal: 20,
     gap: 12,
+    marginTop: 10,
   },
   statCard: {
     width: (width - 52) / 2,
@@ -917,7 +1029,7 @@ const styles = StyleSheet.create({
   },
   statusText: { fontSize: 11, fontWeight: "600" },
   
-  // New styles for action buttons
+  // Action buttons styles
   actionButtonsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1082,29 +1194,62 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.slateDark,
   },
-  halfDayContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 16,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: COLORS.grayLight,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  checkboxActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  halfDayText: {
-    fontSize: 14,
-    color: COLORS.slateDark,
-  },
+  halfDaySection: {
+  marginBottom: 16,
+},
+
+halfDayContainer: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: 8,
+},
+
+halfDayButton: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  paddingHorizontal: 16,
+  paddingVertical: 12,
+  borderRadius: 12,
+  backgroundColor: COLORS.grayLight,
+  borderWidth: 2,
+  borderColor: "transparent",
+  minWidth: "100%",
+},
+
+halfDayButtonActive: {
+  backgroundColor: COLORS.primary,
+  borderColor: COLORS.primary,
+},
+
+halfDayContent: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 8,
+},
+
+halfDayButtonText: {
+  fontSize: 14,
+  color: COLORS.slateDark,
+  fontWeight: "600",
+},
+
+halfDayButtonTextActive: {
+  color: COLORS.white,
+},
+
+halfDayBadge: {
+  backgroundColor: "rgba(255,255,255,0.3)",
+  paddingHorizontal: 10,
+  paddingVertical: 4,
+  borderRadius: 16,
+},
+
+halfDayBadgeText: {
+  color: COLORS.white,
+  fontSize: 11,
+  fontWeight: "700",
+},
   daysCalculation: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1135,7 +1280,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   submitButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: "#21c518",
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: "center",

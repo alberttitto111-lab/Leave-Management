@@ -398,10 +398,10 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     elevation: 4,
-    shadowColor: "#000",
+    shadowColor: "#00ff80",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowRadius: 8,
   },
   headerTop: {
     flexDirection: "row",

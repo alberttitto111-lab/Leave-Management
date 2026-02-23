@@ -72,7 +72,7 @@ const getRoleColor = (role) => {
     hod: "#eb862d",
     teacher: "#0d944a",
     student: "#2461e5",
-    staff: "#c847c8",
+    // staff: "#c847c8",
   };
   return colors[role] || "#64748B";
 };
@@ -89,7 +89,7 @@ const UserManagementScreen = ({ navigation }) => {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
 
-  const roles = ["all", "student", "teacher", "hod", "staff", "admin"];
+  const roles = ["all", "student", "teacher", "hod", "admin"];
 
   const fetchUsers = async (pageNum = 1, shouldRefresh = false) => {
     try {
@@ -405,11 +405,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#f1efff",
   },
   header: {
-    paddingTop: 30,
+    paddingTop: 40,
     paddingHorizontal: 20,
-    paddingBottom: 50,
+    paddingBottom: 30,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
+    shadowColor: "#9900ff",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
   headerTop: {
     flexDirection: "row",
@@ -464,6 +469,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: "#1E293B",
+    outlineColor: "transparent", // Remove default focus outline
   },
   statsBar: {
     flexDirection: "row",
