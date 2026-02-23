@@ -1036,3 +1036,13 @@
 {"level":"info","message":"User logged out: TEACH202601","service":"leave-management-api","timestamp":"2026-02-23 12:31:35"}
 {"level":"info","message":"User logged in: HOD202601","service":"leave-management-api","timestamp":"2026-02-23 12:31:50"}
 {"level":"info","message":"User logged out: HOD202601","service":"leave-management-api","timestamp":"2026-02-23 12:32:50"}
+{"level":"info","message":"Server running in development mode on port 5000","service":"leave-management-api","timestamp":"2026-02-23 19:05:59"}
+{"level":"info","message":"MongoDB Connected: ac-z6ucfxl-shard-00-00.oowrzda.mongodb.net","service":"leave-management-api","timestamp":"2026-02-23 19:06:00"}
+{"level":"info","message":"User logged out: ADM0001","service":"leave-management-api","timestamp":"2026-02-23 19:14:24"}
+{"level":"info","message":"User logged in: STUD001","service":"leave-management-api","timestamp":"2026-02-23 19:14:39"}
+{"level":"info","message":"User logged out: STUD001","service":"leave-management-api","timestamp":"2026-02-23 19:20:32"}
+{"level":"info","message":"User logged in: TEACH202601","service":"leave-management-api","timestamp":"2026-02-23 19:20:52"}
+{"level":"info","message":"User logged out: TEACH202601","service":"leave-management-api","timestamp":"2026-02-23 19:25:31"}
+{"level":"info","message":"User logged in: HOD202601","service":"leave-management-api","timestamp":"2026-02-23 19:26:15"}
+{"level":"info","message":"User logged out: HOD202601","service":"leave-management-api","timestamp":"2026-02-23 19:29:34"}
+{"level":"info","message":"User logged in: STUD001","service":"leave-management-api","timestamp":"2026-02-23 19:29:45"}
